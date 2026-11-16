@@ -1,0 +1,21 @@
+{
+  "name": "dropstore",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/backend",
+    "apps/frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run start:dev -w @dropstore/backend\" \"npm run dev -w @dropstore/frontend\"",
+    "build": "npm run build -w @dropstore/backend && npm run build -w @dropstore/frontend",
+    "test": "npm run test -w @dropstore/backend && npm run test -w @dropstore/frontend",
+    "db:generate": "npm run db:generate -w @dropstore/backend",
+    "db:migrate": "npm run db:migrate -w @dropstore/backend",
+    "db:deploy": "npm run db:deploy -w @dropstore/backend",
+    "db:seed": "npm run db:seed -w @dropstore/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
