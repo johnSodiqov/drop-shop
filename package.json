@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "apps/backend",
-    "apps/frontend"
+    "backend",
+    "frontend"
   ],
   "scripts": {
     "dev": "concurrently \"npm run start:dev -w @dropstore/backend\" \"npm run dev -w @dropstore/frontend\"",

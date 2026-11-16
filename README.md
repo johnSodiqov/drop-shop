@@ -28,7 +28,7 @@ The NestJS backend is not deployed by this Vercel configuration. Deploy it separ
 
 ## Deploying the backend to Railway
 
-Import this GitHub repository into Railway and configure the backend service with the repository root as its root directory. This is an npm-workspaces monorepo, so the root `package.json` and `package-lock.json` must remain available to the service.
+Import this GitHub repository into Railway and configure the backend service with the repository root as its root directory. The backend and frontend live in the root-level `backend/` and `frontend/` directories. This is an npm-workspaces monorepo, so the root `package.json` and `package-lock.json` must remain available to the service.
 
 Use these service settings:
 

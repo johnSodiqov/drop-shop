@@ -5,6 +5,6 @@ coverage/
 .env
 .env.*
 !.env.example
-apps/backend/test/*.e2e-spec.ts
+backend/test/*.e2e-spec.ts
 *.log
 .DS_Store

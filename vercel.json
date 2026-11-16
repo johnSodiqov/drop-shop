@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build --workspace @dropstore/frontend",
-  "outputDirectory": "apps/frontend/dist",
+  "outputDirectory": "frontend/dist",
   "rewrites": [
     {
       "source": "/(.*)",

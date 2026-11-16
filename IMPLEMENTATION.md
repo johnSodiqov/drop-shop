@@ -7,7 +7,7 @@
 - **Пункт ТЗ:** модульное веб-приложение с отдельными frontend, backend и базой данных; обязательный стек из запроса — NestJS/TypeScript, React/Vite/TypeScript, PostgreSQL и Prisma.
 - **Статус:** реализован.
 - **Реализация:** создан npm-workspaces monorepo. NestJS API и React SPA развёртываются независимо; Prisma Schema и SQL-миграция описывают PostgreSQL. В `ТЗ.md` есть устаревшие рекомендации PHP/MySQL, а в исходных backend/database разделах `AGENT_RULES.md` также был PHP/MySQL. Они противоречили запросу и `ARCHITECTURE.md`; технологические указания в `AGENT_RULES.md` приведены к обязательному стеку, остальные применимые правила сохранены.
-- **Файлы:** `package.json`, `apps/backend/`, `apps/frontend/`, `prisma/`, `AGENT_RULES.md`.
+- **Файлы:** `package.json`, `backend/`, `frontend/`, `prisma/`, `AGENT_RULES.md`.
 - **Архитектурное решение:** модульный монолит без микросервисов; API — единственный компонент с доступом к БД.
 - **Взаимодействие:** браузер вызывает REST API с префиксом `/api/v1`; backend-модули работают с PostgreSQL через Prisma Client.
 - **Проверка:** `npm run build` успешно собирает backend и frontend; `npm run db:generate` успешно генерирует Prisma Client.
@@ -36,7 +36,7 @@
 - **Пункт ТЗ:** роли ADMIN, AGENT и CUSTOMER с разграничением доступа; клиент не должен получать внутренние цены и прибыль других пользователей.
 - **Статус:** реализован.
 - **Реализация:** новые регистрации всегда создают CUSTOMER. Администратор меняет роль и активность пользователя; при назначении AGENT в той же транзакции создаётся уникальный профиль с referral-кодом. JWT Strategy заново получает пользователя из БД, а Guards проверяют роль на backend. Кабинет и API ограничены соответствующими ролями; заказы агента и покупателя выбираются только по их идентификатору. Финансовые поля товара и заказа удаляются из ответов покупателям.
-- **Файлы:** `apps/backend/src/common/auth/`, `apps/backend/src/modules/auth/`, `apps/backend/src/modules/admin/`, `apps/backend/src/modules/orders/orders.service.ts`, `apps/backend/src/modules/products/products.service.ts`, `apps/frontend/src/features/auth/ProtectedRoute.tsx`, `apps/frontend/src/App.tsx`.
+- **Файлы:** `backend/src/common/auth/`, `backend/src/modules/auth/`, `backend/src/modules/admin/`, `backend/src/modules/orders/orders.service.ts`, `backend/src/modules/products/products.service.ts`, `frontend/src/features/auth/ProtectedRoute.tsx`, `frontend/src/App.tsx`.
 - **Архитектурное решение:** frontend-маршруты служат UX-ограничением; окончательная авторизация и фильтрация данных всегда выполняются сервером.
 - **Взаимодействие:** `AdminService.updateUser` создаёт AgentProfile; `JwtStrategy` подставляет актуальную роль в Guards и сервисы заказов; SPA строит разрешённые маршруты по сессии.
 - **Проверка:** backend/frontend собираются; unit-тесты заказа проверяют резервирование и отмену. Полноценные HTTP/RBAC сценарии с БД не запускались.
@@ -47,7 +47,7 @@
 - **Пункт ТЗ:** регистрация и вход по уникальному телефону формата `+998XXXXXXXXX`, безопасное хранение пароля и защита от повторной регистрации.
 - **Статус:** частично реализован.
 - **Реализация:** DTO валидируют имя, телефон и пароль; телефон уникален в PostgreSQL. Пароль хешируется bcryptjs с 12 раундами и ограничен 72 UTF-8 байтами (ограничение bcrypt). Access JWT действует 15 минут; refresh JWT действует 7 дней, ротируется при обновлении, хранится в БД только в bcrypt-хеше и передаётся HttpOnly/SameSite Strict cookie. Login/register ограничены rate limiter. Logout отзывает refresh-токен и очищает cookie.
-- **Файлы:** `apps/backend/src/modules/auth/`, `apps/backend/src/common/auth/jwt.strategy.ts`, `apps/frontend/src/features/auth/AuthProvider.tsx`, `apps/frontend/src/features/auth/AuthPages.tsx`.
+- **Файлы:** `backend/src/modules/auth/`, `backend/src/common/auth/jwt.strategy.ts`, `frontend/src/features/auth/AuthProvider.tsx`, `frontend/src/features/auth/AuthPages.tsx`.
 - **Архитектурное решение:** короткоживущий access-токен находится в памяти SPA; refresh-cookie недоступна JavaScript. Это уменьшает последствия XSS и ограничивает повторное использование refresh-токена.
 - **Взаимодействие:** `AuthProvider` восстанавливает сессию через `/auth/refresh`, затем получает `/auth/me`; защищённые API требуют bearer access-токен.
 - **Проверка:** frontend-тест проверяет валидацию формы входа; сборки обеих частей проходят.
@@ -58,7 +58,7 @@
 - **Пункт ТЗ:** каталог с поиском и категориями; товар хранит SKU, текст, изображения, цены, остаток, статус и дату создания; покупателю не раскрываются закупочные данные.
 - **Статус:** реализован.
 - **Реализация:** публичный каталог возвращает только ACTIVE товары с положительным остатком, поддерживает фильтр категории и поиск по названию/SKU. Каталог агента дополнительно возвращает закупочную и минимальную цену. Администратор создаёт, редактирует и архивирует товар, меняет остаток и ценовые ограничения. Категории создаются, переименовываются и удаляются только при отсутствии товаров. Изображения задаются URL главной фотографии и списком дополнительных URL.
-- **Файлы:** `apps/backend/src/modules/products/`, `apps/backend/src/modules/categories/`, `apps/frontend/src/features/products/CatalogPage.tsx`, `apps/frontend/src/features/admin/AdminPages.tsx`.
+- **Файлы:** `backend/src/modules/products/`, `backend/src/modules/categories/`, `frontend/src/features/products/CatalogPage.tsx`, `frontend/src/features/admin/AdminPages.tsx`.
 - **Архитектурное решение:** архивирование вместо физического удаления сохраняет ссылки и снимки уже оформленных заказов; выдача публичной и агентской модели разделена в `ProductsService`.
 - **Взаимодействие:** товары ссылаются на категорию и отдельную запись Inventory; изменения остатков создают движения. Каталог используется покупателями, агентами и формой заказа.
 - **Проверка:** frontend/backend собираются. Проверка CRUD и фильтров против PostgreSQL ожидает валидную строку подключения.
@@ -69,7 +69,7 @@
 - **Пункт ТЗ:** агент устанавливает допустимую цену; прибыль равна цене продажи минус закупочная цена; администратор задаёт минимум, рекомендованную цену, максимум наценки и возможность запретить изменение цены.
 - **Статус:** реализован.
 - **Реализация:** `PricingService` централизованно проверяет цену и считает прибыль серверными Decimal-значениями. Цена должна быть не ниже минимума и не выше закупочной цены плюс maximumMarkup; при запрете редактирования агентом принимается только рекомендованная цена. Заказ никогда не доверяет переданной клиентом закупочной цене и заново загружает текущие значения продукта.
-- **Файлы:** `apps/backend/src/modules/pricing/`, `apps/backend/src/modules/products/dto/`, `apps/backend/src/modules/products/products.service.ts`, `apps/backend/src/modules/orders/orders.service.ts`, `apps/frontend/src/features/orders/CartPage.tsx`, `apps/frontend/src/features/agent/AgentPages.tsx`.
+- **Файлы:** `backend/src/modules/pricing/`, `backend/src/modules/products/dto/`, `backend/src/modules/products/products.service.ts`, `backend/src/modules/orders/orders.service.ts`, `frontend/src/features/orders/CartPage.tsx`, `frontend/src/features/agent/AgentPages.tsx`.
 - **Архитектурное решение:** расчёты выполняются через Prisma Decimal (DB Decimal(12,2)); отдельный PricingService используется заказами и тестами.
 - **Взаимодействие:** цена проверяется перед созданием заказа, фиксируется в OrderItem и затем агрегируется для кабинета агента и административной статистики.
 - **Проверка:** три unit-теста `PricingService` покрывают расчёт прибыли, нижний/верхний пределы и фиксированную цену; тесты проходят в `npm test`.
@@ -80,7 +80,7 @@
 - **Пункт ТЗ:** покупатель/агент добавляет товары, указывает данные получателя и адрес, отправляет заказ и видит его номер/статус; заказ хранит список товаров, количество, цены и контактные данные.
 - **Статус:** реализован.
 - **Реализация:** корзина поддерживает изменение количества и удаление строки. Checkout проверяет форму и отправляет товарные идентификаторы/количество, данные получателя и idempotency key. Backend рассчитывает сумму сам, объединяет повторяющиеся строки одного товара и создаёт уникальный номер. Для агентских заказов сохраняются его цена и прибыль; клиентский заказ по реферальному коду привязывается к агенту. Повторный запрос с тем же ключом возвращает ранее созданный заказ владельцу ключа.
-- **Файлы:** `apps/frontend/src/features/cart/CartProvider.tsx`, `apps/frontend/src/features/orders/CartPage.tsx`, `apps/frontend/src/features/orders/OrdersPage.tsx`, `apps/backend/src/modules/orders/`, `prisma/schema.prisma`.
+- **Файлы:** `frontend/src/features/cart/CartProvider.tsx`, `frontend/src/features/orders/CartPage.tsx`, `frontend/src/features/orders/OrdersPage.tsx`, `backend/src/modules/orders/`, `prisma/schema.prisma`.
 - **Архитектурное решение:** идентификатор запроса уникален в БД и хранится в `sessionStorage` отдельно по пользователю, поэтому повторная отправка после сетевой ошибки не создаёт дубликат.
 - **Взаимодействие:** checkout вызывает `/api/v1/orders`; история запрашивает только собственные заказы покупателя/агента. Агентская ссылка передаёт referral-код через URL и сохраняет его до оформления.
 - **Проверка:** unit-тест заказов проверяет серверный расчёт суммы/прибыли и вызов Telegram dispatch; frontend-тесты и сборки проходят. Повторный checkout и история не проверены против живой БД.
@@ -91,7 +91,7 @@
 - **Пункт ТЗ:** проверка товара/цены/остатка, атомарное создание заказа и резервирование, аудит движения, переходы статусов и однократное восстановление склада при отмене.
 - **Статус:** реализован.
 - **Реализация:** создание заказа, OrderItems, начальная запись истории статусов, уменьшение остатков, InventoryMovement и запись Telegram-уведомления выполняются в Serializable Prisma-транзакции. Остаток уменьшается условным атомарным `updateMany` только при `quantity >= requested`; конфликт приводит к rollback, отрицательный склад не создаётся. При нуле товар переводится в OUT_OF_STOCK. Разрешены только последовательные переходы NEW→CONFIRMED→PACKING→DELIVERY→DELIVERED либо CANCELLED до доставки. Переход защищён условным обновлением текущего статуса. Отмена и возврат остатков происходят в одной транзакции; повторная отмена невозможна. История сохраняет инициатора и переход.
-- **Файлы:** `apps/backend/src/modules/orders/orders.service.ts`, `apps/backend/src/modules/inventory/inventory.service.ts`, `apps/backend/src/modules/orders/orders.service.spec.ts`, `prisma/schema.prisma`, начальная миграция в `prisma/migrations/`.
+- **Файлы:** `backend/src/modules/orders/orders.service.ts`, `backend/src/modules/inventory/inventory.service.ts`, `backend/src/modules/orders/orders.service.spec.ts`, `prisma/schema.prisma`, начальная миграция в `prisma/migrations/`.
 - **Архитектурное решение:** операции используют Prisma `$transaction` с Serializable isolation; InventoryMovement служит неизменяемым журналом резервирования, ручной корректировки и возврата.
 - **Взаимодействие:** OrdersService делегирует резерв/возврат InventoryService, расчёт цены PricingService и запись событий TelegramService.
 - **Проверка:** два unit-теста OrdersService проверяют атомарное списание/ценовые снимки и однократный возврат остатков; все 5 backend unit-тестов проходят. Конкурентный тест с настоящей PostgreSQL не запускался.
@@ -102,7 +102,7 @@
 - **Пункт ТЗ:** уведомлять администратора о новом заказе, отмене и смене статуса; ошибка доставки не должна отменять заказ; нужны логирование и retry.
 - **Статус:** реализован.
 - **Реализация:** Telegram Bot API вызывается после commit заказа/статуса. NotificationLog создаётся внутри той же транзакции; доставка асинхронная, с timeout, HTML escaping, статусами PENDING/PROCESSING/SENT/FAILED и экспоненциальными повторами до 8 попыток. Периодическая задача восстанавливает зависшие PROCESSING записи. Администратор видит историю и может вручную повторить FAILED уведомление.
-- **Файлы:** `apps/backend/src/modules/telegram/`, `apps/backend/src/modules/orders/orders.service.ts`, `apps/backend/src/modules/admin/admin.controller.ts`, `prisma/schema.prisma`.
+- **Файлы:** `backend/src/modules/telegram/`, `backend/src/modules/orders/orders.service.ts`, `backend/src/modules/admin/admin.controller.ts`, `prisma/schema.prisma`.
 - **Архитектурное решение:** журнал уведомлений является transactional outbox: запись фиксируется вместе с бизнес-событием, сетевой вызов не удерживает/не откатывает заказ.
 - **Взаимодействие:** TelegramService читает сохранённый заказ, агентский профиль и статусную историю; AdminController предоставляет просмотр/повтор.
 - **Проверка:** сборка и unit-тесты заказа проходят; отправка сообщения не проверялась, потому что Telegram bot token/chat ID не настроены. Поведение внешнего API зависит от сети и корректности этих значений.
@@ -113,7 +113,7 @@
 - **Пункт ТЗ:** dashboard, товары, категории, заказы, пользователи, агенты, статистика, настройки и полный доступ администратора.
 - **Статус:** реализован.
 - **Реализация:** API и SPA предоставляют счётчики товаров/заказов/активных агентов, сумму незакрытых отменой продаж, новые заказы, низкий остаток, топ-10 товаров и агентов; CRUD товаров/категорий; смену статусов заказов; список пользователей, назначение ролей и блокировку; агентские продажи/прибыль; настройку порога низкого остатка; состояние Telegram и журнал уведомлений. Административные изменения пользователя, товара и настроек записываются в AuditLog.
-- **Файлы:** `apps/backend/src/modules/admin/`, `apps/backend/src/modules/products/admin-products.controller.ts`, `apps/backend/src/modules/categories/`, `apps/backend/src/modules/telegram/telegram.controller.ts`, `apps/frontend/src/features/admin/AdminPages.tsx`, `apps/frontend/src/App.tsx`.
+- **Файлы:** `backend/src/modules/admin/`, `backend/src/modules/products/admin-products.controller.ts`, `backend/src/modules/categories/`, `backend/src/modules/telegram/telegram.controller.ts`, `frontend/src/features/admin/AdminPages.tsx`, `frontend/src/App.tsx`.
 - **Архитектурное решение:** агрегаты рассчитываются в AdminService через Prisma; права ADMIN проверяются на каждом admin endpoint.
 - **Взаимодействие:** dashboard использует Order, OrderItem, Product, Inventory и User; операции проходят через профильные сервисы, а не через frontend-доступ к БД.
 - **Проверка:** backend/frontend build проходят; тесты бизнес-логики цен и заказов проходят. Запросы dashboard и CRUD не запускались на настроенной PostgreSQL.
@@ -124,7 +124,7 @@
 - **Пункт ТЗ:** агентский dashboard, каталог с закупочной ценой, собственные продажи/прибыль/заказы, личные ссылки.
 - **Статус:** реализован.
 - **Реализация:** dashboard агрегирует число заказов, сумму продаж, прибыль, доставленные и отменённые заказы; отдельная страница показывает прибыль/продажи, каталог позволяет выбрать допустимую цену, а страница ссылок формирует URL каждого доступного товара с персональным referral-кодом. При переходе покупателя по ссылке код сохраняется и при checkout проверяется сервером, после чего заказ относится к агенту.
-- **Файлы:** `apps/backend/src/modules/agent/`, `apps/backend/src/modules/orders/orders.service.ts`, `apps/frontend/src/features/agent/AgentPages.tsx`, `apps/frontend/src/App.tsx`.
+- **Файлы:** `backend/src/modules/agent/`, `backend/src/modules/orders/orders.service.ts`, `frontend/src/features/agent/AgentPages.tsx`, `frontend/src/App.tsx`.
 - **Архитектурное решение:** referral attribution хранится на Order как `agentId`; статистика рассчитывается из сохранённых заказов и не требует отдельной неустойчивой browser-аналитики.
 - **Взаимодействие:** AgentService использует ProductsService для безопасной выдачи агентского каталога; OrderService проверяет активный профиль по referralCode и связывает заказ.
 - **Проверка:** сборки проходят. Агрегаты и реферальное оформление требуют подключения БД для сквозной проверки.
@@ -135,7 +135,7 @@
 - **Пункт ТЗ:** минималистичный светлый e-commerce/SaaS интерфейс с зелёным акцентом, мобильной адаптацией, навигацией, загрузкой/ошибками/пустыми состояниями.
 - **Статус:** частично реализован.
 - **Реализация:** SPA содержит каталог/карточку товара, корзину, checkout, профиль, историю заказов и панели ролей; CSS задаёт адаптивные карточки, формы, таблицы и навигацию. Запросы используют React Query/Axios, формы — React Hook Form/Zod. Есть loading/error/empty states, lazy-loading изображений и подтверждение архивирования/удаления.
-- **Файлы:** `apps/frontend/src/App.tsx`, `apps/frontend/src/components/`, `apps/frontend/src/features/`, `apps/frontend/src/styles.css`, `apps/frontend/src/lib/api.ts`.
+- **Файлы:** `frontend/src/App.tsx`, `frontend/src/components/`, `frontend/src/features/`, `frontend/src/styles.css`, `frontend/src/lib/api.ts`.
 - **Архитектурное решение:** функциональные страницы сгруппированы по возможностям; общие layout и API helper используются повторно. Визуальная система собрана в одном stylesheet.
 - **Взаимодействие:** React Router задаёт разделы по ролям; React Query синхронизирует данные с REST API; AuthProvider и CartProvider предоставляют сессию/корзину.
 - **Проверка:** production-сборка Vite/TypeScript и компонентный тест формы входа проходят. Визуальная проверка браузера и smoke-тест реального API не выполнялись.
@@ -146,7 +146,7 @@
 - **Пункт ТЗ:** PostgreSQL/Prisma Schema, relations, enum статусов, Decimal, UTC Timestamptz, уникальные поля и индексы.
 - **Статус:** реализован; фактическое применение к локальной БД не проверено.
 - **Реализация:** схема содержит User/AgentProfile/Category/Product/Inventory/InventoryMovement/Order/OrderItem/OrderStatusHistory/NotificationLog/Setting/AuditLog. Денежные поля — Decimal(12,2), время — Timestamptz(3), ключи и связи защищены unique/index/foreign key. Начальная SQL-миграция создана Prisma Migrate; seed создаёт администратора только с заданными окружением секретами и стартовый каталог.
-- **Файлы:** `prisma/schema.prisma`, `prisma.config.ts`, `prisma/migrations/20261105000000_init/migration.sql`, `apps/backend/prisma/seed.ts`, `apps/backend/src/prisma/`.
+- **Файлы:** `prisma/schema.prisma`, `prisma.config.ts`, `prisma/migrations/20261105000000_init/migration.sql`, `backend/prisma/seed.ts`, `backend/src/prisma/`.
 - **Архитектурное решение:** Prisma 7 подключается к PostgreSQL через `@prisma/adapter-pg`; runtime-конфигурация находится в PrismaService, CLI — в `prisma.config.ts`.
 - **Взаимодействие:** все NestJS модули получают глобальный PrismaService; seed и API используют одну схему.
 - **Проверка:** `npm run db:generate` и `npx prisma validate --config prisma.config.ts` успешны. `npm run db:migrate` достиг PostgreSQL, но получил P1000 Authentication failed; миграция и seed не применены. В среде запущена служба PostgreSQL на 5432, но пароль `dropstore-dev-only` из примера ей не подходит.
@@ -157,7 +157,7 @@
 - **Пункт ТЗ:** серверная проверка ролей, hash паролей, защита API, валидация, rate limiting, CSRF-aware cookie, XSS/SQL injection защита и административный аудит.
 - **Статус:** реализован на уровне приложения.
 - **Реализация:** глобальная валидация DTO преобразует и запрещает неизвестные поля; Prisma использует параметризованные запросы; Helmet задаёт HTTP security headers; авторизационные guards и ограничения ролей применяются на backend; login/register ограничиваются rate limiter; пароль и refresh token хешируются; cookie HttpOnly/SameSite Strict; чувствительные финансовые поля отфильтровываются для CUSTOMER; административные изменения записываются в AuditLog.
-- **Файлы:** `apps/backend/src/main.ts`, `apps/backend/src/config/environment.ts`, `apps/backend/src/common/auth/`, DTO в `apps/backend/src/modules/`, `apps/backend/src/modules/admin/admin.service.ts`.
+- **Файлы:** `backend/src/main.ts`, `backend/src/config/environment.ts`, `backend/src/common/auth/`, DTO в `backend/src/modules/`, `backend/src/modules/admin/admin.service.ts`.
 - **Архитектурное решение:** безопасность enforced на API и БД, не только в UI; ссылки на ID сами по себе не дают доступ к чужим заказам.
 - **Взаимодействие:** ValidationPipe проверяет вход до контроллера; Guards передают подтверждённого пользователя сервисам; Prisma constraints защищают уникальность и связи.
 - **Проверка:** TypeScript build проходит; `npm audit --omit=dev` сообщил `found 0 vulnerabilities`. Полный security/RBAC integration suite не запускался.
@@ -168,7 +168,7 @@
 - **Пункт ТЗ:** проверяемое приложение с командами установки, миграций, запуска и тестирования.
 - **Статус:** частично реализован.
 - **Реализация:** README описывает Node/npm/PostgreSQL, настройку `.env`, генерацию клиента, миграцию, seed и запуск; npm scripts запускают backend+frontend, собирают оба workspace, тестируют Jest/Vitest.
-- **Файлы:** `README.md`, `package.json`, `apps/backend/package.json`, `apps/frontend/package.json`, конфигурации Nest/Vite/Jest/Vitest.
+- **Файлы:** `README.md`, `package.json`, `backend/package.json`, `frontend/package.json`, конфигурации Nest/Vite/Jest/Vitest.
 - **Архитектурное решение:** единые root scripts сокращают расхождение команд между разработчиками.
 - **Взаимодействие:** `npm run dev`, `npm run build`, `npm test`, `npm run db:generate`, `npm run db:migrate`, `npm run db:deploy`, `npm run db:seed`.
 - **Проверка:** `npm test` — 2 backend suites / 7 tests и 1 frontend suite / 1 test прошли; `npm run build` прошёл для backend и frontend; `npm audit --omit=dev` — 0 production vulnerabilities. `curl.exe http://127.0.0.1:5173/` вернул HTTP 200 для SPA. Seed прошёл валидацию небезопасных placeholder-значений, но с тестовыми env значениями не смог подключиться к локальной БД (P1000).
