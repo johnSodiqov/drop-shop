@@ -26,6 +26,21 @@ Import the repository into Vercel with the repository root as the project root. 
 
 The NestJS backend is not deployed by this Vercel configuration. Deploy it separately to a Node.js host, provision PostgreSQL, set the backend environment variables from `.env.example` (including a production `DATABASE_URL`, distinct strong JWT secrets, and `FRONTEND_URL` set to the Vercel site URL), then apply migrations with `npm run db:deploy`. Do not deploy using the example credentials.
 
+## Deploying the backend to Railway
+
+Import this GitHub repository into Railway and configure the backend service with the repository root as its root directory. This is an npm-workspaces monorepo, so the root `package.json` and `package-lock.json` must remain available to the service.
+
+Use these service settings:
+
+- Build command: `npm run db:generate && npm run build --workspace @dropstore/backend`
+- Pre-deploy command: `npm run db:deploy --workspace @dropstore/backend`
+- Start command: `npm run start --workspace @dropstore/backend`
+- Healthcheck path: `/api/v1/health`
+
+Add a Railway PostgreSQL service and set the backend service's `DATABASE_URL` to that database's connection URL. Set `NODE_ENV=production`, `FRONTEND_URL` to the Vercel site origin only (for example, `https://shop.example.com`, with no path or trailing slash), and two different random `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` values of at least 32 characters. Railway supplies `PORT`; do not hard-code it. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ADMIN_CHAT_ID` only if Telegram notifications are needed.
+
+Generate a public domain for the backend in Railway's Networking settings, then set Vercel's `VITE_API_URL` to that domain ending in `/api/v1`. The local `.env` files are ignored by Git and must not be copied to Railway. In particular, generate fresh production JWT secrets and admin credentials instead of reusing local or example values. After configuring the variables, deploy; the pre-deploy command applies committed Prisma migrations. Run `npm run db:seed --workspace @dropstore/backend` as a one-time command if you need to create the initial administrator and sample catalog.
+
 ## First administrator
 
 The seed command creates the `ADMIN` account from `ADMIN_PHONE` and `ADMIN_PASSWORD`. The seed fails rather than silently using a hard-coded password when either value is missing. Change the password after first sign-in and never deploy the example credentials.
