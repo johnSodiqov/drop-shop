@@ -30,7 +30,7 @@ The API is available at `http://localhost:3000/api/v1`; the SPA is at `http://lo
 
 ## Deploying the frontend to Vercel
 
-The Vercel project uses `frontend` as its Root Directory. Keep the Output Directory set to `dist`. The root `vercel.json` runs the frontend build from that project root and serves client-side routes. Set `VITE_API_URL` in the Vercel project to `https://drop-shop-production.up.railway.app/api/v1`.
+The Vercel project uses `frontend` as its Root Directory. Keep the Output Directory set to `dist`. The root `vercel.json` runs the frontend build from that project root and serves client-side routes. The frontend defaults to the Railway API URL `https://drop-shop-production.up.railway.app/api/v1`; set `VITE_API_URL` in Vercel only if you need to override it.
 
 The NestJS backend is not deployed by this Vercel configuration; the production API runs on Railway. Set its environment variables there, including Neon connection URLs, distinct strong JWT secrets, and `FRONTEND_URL` set to the Vercel site URL. Never deploy using the example credentials.
 
