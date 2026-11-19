@@ -19,6 +19,21 @@ import { RegisterDto } from './dto/register.dto';
 
 const REFRESH_COOKIE = 'dropstore_refresh';
 
+export function getRefreshCookieOptions(nodeEnv: unknown): {
+  httpOnly: true;
+  secure: boolean;
+  sameSite: 'strict' | 'none';
+  path: string;
+} {
+  const isProduction = nodeEnv === 'production';
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'strict',
+    path: '/api/v1/auth',
+  };
+}
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -83,17 +98,7 @@ export class AuthController {
     });
   }
 
-  private cookieOptions(): {
-    httpOnly: true;
-    secure: boolean;
-    sameSite: 'strict';
-    path: string;
-  } {
-    return {
-      httpOnly: true,
-      secure: this.config.get('NODE_ENV') === 'production',
-      sameSite: 'strict',
-      path: '/api/v1/auth',
-    };
+  private cookieOptions(): ReturnType<typeof getRefreshCookieOptions> {
+    return getRefreshCookieOptions(this.config.get('NODE_ENV'));
   }
 }
