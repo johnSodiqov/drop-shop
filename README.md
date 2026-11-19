@@ -4,7 +4,7 @@ DropStore is a modular-monolith dropshipping platform. The API is NestJS/TypeScr
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 20.19+, 22.12+, or 24+
 - npm 10+
 - PostgreSQL 15+
 
@@ -30,14 +30,11 @@ The NestJS backend is not deployed by this Vercel configuration. Deploy it separ
 
 Import this GitHub repository into Railway and configure the backend service with the repository root as its root directory. The backend and frontend live in the root-level `backend/` and `frontend/` directories. This is an npm-workspaces monorepo, so the root `package.json` and `package-lock.json` must remain available to the service.
 
-Use these service settings:
+The root `railway.json` defines the backend build, migration, start, and healthcheck commands. Keep the service root directory at the repository root; setting it to `backend/` breaks npm workspace and Prisma config paths.
 
-- Build command: `npm run db:generate && npm run build --workspace @dropstore/backend`
-- Pre-deploy command: `npm run db:deploy --workspace @dropstore/backend`
-- Start command: `npm run start:prod --workspace @dropstore/backend`
-- Healthcheck path: `/api/v1/health`
+The build generates Prisma Client and compiles only the backend. Before deployment, Railway applies PostgreSQL migrations; the production start command runs `backend/dist/main.js` through the backend workspace.
 
-Add a Railway PostgreSQL service and set the backend service's `DATABASE_URL` to that database's connection URL. Set `NODE_ENV=production`, `FRONTEND_URL` to the Vercel site origin only (for example, `https://shop.example.com`, with no path or trailing slash), and two different random `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` values of at least 32 characters. Railway supplies `PORT`; do not hard-code it. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ADMIN_CHAT_ID` only if Telegram notifications are needed.
+Add a Railway PostgreSQL service and set the backend service's `DATABASE_URL` to that database's connection URL before deployment. Prisma Client generation does not need a database connection, but the pre-deploy migration and running API do. Do not use a fake URL to make migrations or startup appear successful. Set `NODE_ENV=production`, `FRONTEND_URL` to the Vercel site origin only (for example, `https://shop.example.com`, with no path or trailing slash), and two different random `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` values of at least 32 characters. Railway supplies `PORT`; the server listens on it automatically. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ADMIN_CHAT_ID` only if Telegram notifications are needed.
 
 Generate a public domain for the backend in Railway's Networking settings, then set Vercel's `VITE_API_URL` to that domain ending in `/api/v1`. The local `.env` files are ignored by Git and must not be copied to Railway. In particular, generate fresh production JWT secrets and admin credentials instead of reusing local or example values. After configuring the variables, deploy; the pre-deploy command applies committed Prisma migrations. Run `npm run db:seed --workspace @dropstore/backend` as a one-time command if you need to create the initial administrator and sample catalog.
 

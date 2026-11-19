@@ -2,6 +2,9 @@
   "name": "dropstore",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "^20.19 || ^22.12 || >=24.0"
+  },
   "workspaces": [
     "backend",
     "frontend"
