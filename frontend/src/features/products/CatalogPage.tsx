@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Search, ShoppingBag, SlidersHorizontal, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ArrowLeft, ArrowRight, Search, ShoppingBag, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, errorMessage, formatMoney } from '../../lib/api';
 import { Category, Product } from '../../types';
@@ -98,6 +98,59 @@ export function CatalogPage() {
   );
 }
 
+function ProductGallery({ product }: { product: Product }) {
+  const images = [...new Set([product.imageUrl, ...(product.imageUrls ?? [])].filter((url): url is string => Boolean(url)))];
+  const [activeIndex, setActiveIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+
+  if (!images.length) {
+    return <div className="detail-gallery detail-gallery-empty"><ShoppingBag size={60} /></div>;
+  }
+
+  const showImage = (index: number) => setActiveIndex((index + images.length) % images.length);
+  const handleTouchEnd = (touchEndX: number) => {
+    if (touchStartX.current === null || images.length < 2) return;
+    const difference = touchStartX.current - touchEndX;
+    if (Math.abs(difference) > 40) showImage(activeIndex + (difference > 0 ? 1 : -1));
+    touchStartX.current = null;
+  };
+
+  return (
+    <div className="detail-gallery">
+      <div
+        className="detail-gallery-main"
+        onTouchStart={(event) => { touchStartX.current = event.changedTouches[0]?.clientX ?? null; }}
+        onTouchEnd={(event) => handleTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
+      >
+        <img src={images[activeIndex]} alt={`${product.name} — фото ${activeIndex + 1}`} />
+        {images.length > 1 && (
+          <>
+            <button type="button" className="gallery-arrow gallery-arrow-left" aria-label="Предыдущее фото" onClick={() => showImage(activeIndex - 1)}><ArrowLeft size={20} /></button>
+            <button type="button" className="gallery-arrow gallery-arrow-right" aria-label="Следующее фото" onClick={() => showImage(activeIndex + 1)}><ArrowRight size={20} /></button>
+            <span className="gallery-counter">{activeIndex + 1} / {images.length}</span>
+          </>
+        )}
+      </div>
+      {images.length > 1 && (
+        <div className="gallery-thumbnails" aria-label="Все фотографии товара">
+          {images.map((image, index) => (
+            <button
+              key={image}
+              type="button"
+              className={index === activeIndex ? 'gallery-thumbnail active' : 'gallery-thumbnail'}
+              aria-label={`Показать фото ${index + 1}`}
+              aria-pressed={index === activeIndex}
+              onClick={() => showImage(index)}
+            >
+              <img src={image} alt="" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ProductDetailsPage() {
   const { user } = useAuth();
   const { add } = useCart();
@@ -123,7 +176,7 @@ export function ProductDetailsPage() {
     <PageContainer className="detail-page">
       <Link className="back-link" to="/"><ArrowRight className="back-arrow" size={16} /> Назад в каталог</Link>
       <div className="detail-layout">
-        <div className="detail-image">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <ShoppingBag size={60} />}</div>
+        <ProductGallery key={product.id} product={product} />
         <div className="detail-content">
           <span className="eyebrow">{product.category.name} · {product.sku}</span>
           <h1>{product.name}</h1><p className="detail-description">{product.description}</p>
