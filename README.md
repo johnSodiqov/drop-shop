@@ -24,13 +24,13 @@ The API is available at `http://localhost:3000/api/v1`; the SPA is at `http://lo
 
 | Service | Provider and location | Details |
 | --- | --- | --- |
-| Frontend | Vercel | React/Vite SPA built from the repository root using `vercel.json`; the build publishes to the root `dist/` directory. Its public domain is managed in the Vercel project settings. |
+| Frontend | Vercel | React/Vite SPA built from the `frontend/` project root using `vercel.json`; the build publishes to `frontend/dist/`. Its public domain is managed in the Vercel project settings. |
 | Backend API | Railway | NestJS service `drop-shop`, available at `https://drop-shop-production.up.railway.app`. Railway's root directory is `/`, but the configured build and start commands target only `@dropstore/backend`. |
 | PostgreSQL | Neon | PostgreSQL 17, project `Drop-shop`, branch `production`, database `dropstore`. The API uses the pooled `DATABASE_URL`; Prisma migrations use `DATABASE_URL_UNPOOLED`. |
 
 ## Deploying the frontend to Vercel
 
-Import the repository into Vercel with the repository root as the project root (not `frontend`). The root `vercel.json` builds the React/Vite workspace, copies its output to `dist/`, and serves client-side routes. Set Vercel's Output Directory to `dist` if it is configured in Project Settings. Set `VITE_API_URL` in the Vercel project to `https://drop-shop-production.up.railway.app/api/v1`.
+The Vercel project uses `frontend` as its Root Directory. Keep the Output Directory set to `dist`. The root `vercel.json` runs the frontend build from that project root and serves client-side routes. Set `VITE_API_URL` in the Vercel project to `https://drop-shop-production.up.railway.app/api/v1`.
 
 The NestJS backend is not deployed by this Vercel configuration; the production API runs on Railway. Set its environment variables there, including Neon connection URLs, distinct strong JWT secrets, and `FRONTEND_URL` set to the Vercel site URL. Never deploy using the example credentials.
 
