@@ -34,7 +34,7 @@ Use these service settings:
 
 - Build command: `npm run db:generate && npm run build --workspace @dropstore/backend`
 - Pre-deploy command: `npm run db:deploy --workspace @dropstore/backend`
-- Start command: `npm run start --workspace @dropstore/backend`
+- Start command: `npm run start:prod --workspace @dropstore/backend`
 - Healthcheck path: `/api/v1/health`
 
 Add a Railway PostgreSQL service and set the backend service's `DATABASE_URL` to that database's connection URL. Set `NODE_ENV=production`, `FRONTEND_URL` to the Vercel site origin only (for example, `https://shop.example.com`, with no path or trailing slash), and two different random `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` values of at least 32 characters. Railway supplies `PORT`; do not hard-code it. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ADMIN_CHAT_ID` only if Telegram notifications are needed.
