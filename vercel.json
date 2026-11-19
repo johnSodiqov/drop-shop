@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm run build --workspace @dropstore/frontend",
-  "outputDirectory": "frontend/dist",
+  "buildCommand": "npm run build --workspace @dropstore/frontend && node -e \"require('node:fs').cpSync('frontend/dist', 'dist', { recursive: true })\"",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/(.*)",
