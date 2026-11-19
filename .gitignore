@@ -8,3 +8,4 @@ coverage/
 backend/test/*.e2e-spec.ts
 *.log
 .DS_Store
+.neon
