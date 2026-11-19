@@ -1,3 +1,13 @@
+export const PRODUCTION_FRONTEND_URL = 'https://drop-shop-frontend-beta.vercel.app';
+
+export function getDefaultFrontendUrl(nodeEnv: unknown): string {
+  return nodeEnv === 'production' ? PRODUCTION_FRONTEND_URL : 'http://localhost:5173';
+}
+
+export function getAllowedFrontendOrigins(frontendUrl: string): string[] {
+  return [...new Set([frontendUrl, PRODUCTION_FRONTEND_URL])];
+}
+
 export function validateEnvironment(values: Record<string, unknown>): Record<string, unknown> {
   const access = values.JWT_ACCESS_SECRET;
   const refresh = values.JWT_REFRESH_SECRET;
@@ -13,7 +23,7 @@ export function validateEnvironment(values: Record<string, unknown>): Record<str
   if (typeof databaseUrl !== 'string' || !databaseUrl.startsWith('postgresql://')) {
     throw new Error('DATABASE_URL must be a PostgreSQL connection URL');
   }
-  const frontendUrl = values.FRONTEND_URL ?? 'http://localhost:5173';
+  const frontendUrl = values.FRONTEND_URL ?? getDefaultFrontendUrl(values.NODE_ENV);
   if (typeof frontendUrl !== 'string') throw new Error('FRONTEND_URL must be a URL');
   try {
     const parsedUrl = new URL(frontendUrl);

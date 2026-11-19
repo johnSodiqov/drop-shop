@@ -5,10 +5,12 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { getAllowedFrontendOrigins, getDefaultFrontendUrl } from './config/environment';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
-  const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+  const frontendUrl = process.env.FRONTEND_URL ?? getDefaultFrontendUrl(process.env.NODE_ENV);
+  const frontendOrigins = getAllowedFrontendOrigins(frontendUrl);
 
   app.use(helmet({
     contentSecurityPolicy: {
@@ -18,7 +20,7 @@ async function bootstrap(): Promise<void> {
     },
   }));
   app.use(cookieParser());
-  app.enableCors({ origin: frontendUrl, credentials: true });
+  app.enableCors({ origin: frontendOrigins, credentials: true });
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(
     new ValidationPipe({

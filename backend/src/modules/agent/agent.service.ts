@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { OrderStatus, Prisma, ProductStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { AuthenticatedUser } from '../../common/auth/current-user.decorator';
+import { getDefaultFrontendUrl } from '../../config/environment';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ProductsService } from '../products/products.service';
 
@@ -61,7 +62,8 @@ export class AgentService {
   async personalLinks(user: AuthenticatedUser) {
     const profile = await this.prisma.agentProfile.findUnique({ where: { userId: user.id } });
     if (!profile) throw new NotFoundException('Agent profile is unavailable');
-    const frontend = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+    const frontend = this.config.get<string>('FRONTEND_URL')
+      ?? getDefaultFrontendUrl(this.config.get<string>('NODE_ENV'));
     const products = await this.prisma.product.findMany({
       where: { status: ProductStatus.ACTIVE, inventory: { is: { quantity: { gt: 0 } } } },
       select: { id: true, name: true, imageUrl: true },
