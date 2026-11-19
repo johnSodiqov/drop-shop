@@ -57,6 +57,11 @@ export class CreateProductDto {
   imageUrls?: string[];
 
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageKeys?: string[];
+
+  @IsOptional()
   @IsBoolean()
   allowAgentPriceChange?: boolean;
 

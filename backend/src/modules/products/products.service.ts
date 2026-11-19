@@ -98,6 +98,7 @@ export class ProductsService {
             maximumMarkup: new Prisma.Decimal(input.maximumMarkup),
             imageUrl: input.imageUrl,
             imageUrls: input.imageUrls ?? [],
+            imageKeys: input.imageKeys ?? [],
             allowAgentPriceChange: input.allowAgentPriceChange ?? true,
             status: input.stock > 0 ? ProductStatus.ACTIVE : ProductStatus.OUT_OF_STOCK,
             inventory: { create: { quantity: input.stock } },
@@ -158,6 +159,7 @@ export class ProductsService {
       ...(input.maximumMarkup !== undefined ? { maximumMarkup: new Prisma.Decimal(markup) } : {}),
       ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
       ...(input.imageUrls !== undefined ? { imageUrls: input.imageUrls } : {}),
+      ...(input.imageKeys !== undefined ? { imageKeys: input.imageKeys } : {}),
       ...(input.allowAgentPriceChange !== undefined ? { allowAgentPriceChange: input.allowAgentPriceChange } : {}),
       ...(input.status !== undefined ? { status: input.status } : {}),
     };

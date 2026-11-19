@@ -4,7 +4,9 @@ import { ArrowLeft, ArrowRight, Minus, Plus, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
 import { PageContainer } from '../../components/Layout';
 import { EmptyState } from '../../components/StateView';
 import { useAuth } from '../auth/AuthProvider';
@@ -16,9 +18,96 @@ const checkoutSchema = z.object({
   customerName: z.string().trim().min(2, 'Введите имя').max(100),
   customerPhone: z.string().regex(/^\+998\d{9}$/, 'Введите номер в формате +998XXXXXXXXX'),
   deliveryAddress: z.string().trim().min(5, 'Укажите адрес доставки').max(500),
+  deliveryLatitude: z.number().min(-90).max(90).optional(),
+  deliveryLongitude: z.number().min(-180).max(180).optional(),
+  paymentMethod: z.enum(['CASH', 'CARD_ON_DELIVERY', 'TRANSFER_AGENT']),
   comment: z.string().max(1000).optional(),
 });
 type CheckoutValues = z.infer<typeof checkoutSchema>;
+
+const defaultPosition: [number, number] = [41.311081, 69.240562];
+
+const markerIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
+function AddressPicker({ onSelect }: { onSelect: (address: string, lat: number, lng: number) => void }) {
+  const [position, setPosition] = useState<[number, number]>(defaultPosition);
+  const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setPosition([coords.latitude, coords.longitude]),
+      () => undefined,
+      { timeout: 5000 },
+    );
+  }, []);
+
+  async function reverseGeocode(lat: number, lng: number) {
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=ru`);
+    const data = await response.json();
+    onSelect(data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`, lat, lng);
+  }
+
+  function Recenter() {
+    const map = useMapEvents({});
+    useEffect(() => {
+      map.setView(position);
+    }, [position, map]);
+    return null;
+  }
+
+  async function searchAddress() {
+    if (query.trim().length < 3) return;
+    setSearching(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=1&accept-language=ru`);
+      const data = await response.json();
+      if (data[0]) {
+        const lat = Number(data[0].lat);
+        const lng = Number(data[0].lon);
+        setPosition([lat, lng]);
+        onSelect(data[0].display_name, lat, lng);
+      }
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function MapClick() {
+    useMapEvents({
+      click(event) {
+        const lat = event.latlng.lat;
+        const lng = event.latlng.lng;
+        setPosition([lat, lng]);
+        void reverseGeocode(lat, lng);
+      },
+    });
+    return null;
+  }
+
+  return (
+    <div className="address-picker">
+      <div className="address-search">
+        <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchAddress(); } }} placeholder="Поиск улицы или места" />
+        <button type="button" className="button button-secondary" onClick={() => void searchAddress()} disabled={searching}>{searching ? 'Поиск…' : 'Найти'}</button>
+      </div>
+      <MapContainer center={position} zoom={13} scrollWheelZoom={false} className="checkout-map">
+        <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <Marker position={position} icon={markerIcon} />
+        <MapClick />
+        <Recenter />
+      </MapContainer>
+      <small className="muted">Нажмите на карту для выбора адреса доставки.</small>
+    </div>
+  );
+}
 
 function linePrice(line: CartLine, agent: boolean): number {
   return Number(agent ? line.salePrice ?? line.product.recommendedPrice : line.product.recommendedPrice);
@@ -43,7 +132,11 @@ export function CartPage() {
   const isAgent = user?.role === 'AGENT';
   const form = useForm<CheckoutValues>({
     resolver: zodResolver(checkoutSchema),
-    defaultValues: { customerName: user?.name ?? '', customerPhone: user?.phone ?? '' },
+    defaultValues: {
+      customerName: user?.name ?? '',
+      customerPhone: user?.phone ?? '',
+      paymentMethod: 'CASH',
+    },
   });
   const orderTotal = lines.reduce((sum, line) => sum + linePrice(line, Boolean(isAgent)) * line.quantity, 0);
   const mutation = useMutation({
@@ -103,8 +196,22 @@ export function CartPage() {
             {form.formState.errors.customerName && <small className="field-error">{form.formState.errors.customerName.message}</small>}</label>
           <label className="field"><span>Телефон</span><input placeholder="+998901234567" {...form.register('customerPhone')} />
             {form.formState.errors.customerPhone && <small className="field-error">{form.formState.errors.customerPhone.message}</small>}</label>
-          <label className="field"><span>Адрес доставки</span><textarea rows={3} placeholder="Город, улица, дом, квартира" {...form.register('deliveryAddress')} />
-            {form.formState.errors.deliveryAddress && <small className="field-error">{form.formState.errors.deliveryAddress.message}</small>}</label>
+          <div className="field"><span>Адрес доставки</span>
+            <AddressPicker onSelect={(address, lat, lng) => {
+              form.setValue('deliveryAddress', address, { shouldValidate: true });
+              form.setValue('deliveryLatitude', lat);
+              form.setValue('deliveryLongitude', lng);
+            }} />
+            <textarea rows={3} placeholder="Город, улица, дом, квартира" {...form.register('deliveryAddress')} />
+            {form.formState.errors.deliveryAddress && <small className="field-error">{form.formState.errors.deliveryAddress.message}</small>}
+          </div>
+          <fieldset className="payment-options">
+            <legend>Способ оплаты</legend>
+            <label><input type="radio" value="CASH" {...form.register('paymentMethod')} /><span><b>Наличными</b><small>Оплата при получении</small></span></label>
+            <label><input type="radio" value="CARD_ON_DELIVERY" {...form.register('paymentMethod')} /><span><b>Картой при получении</b><small>Оплата курьеру</small></span></label>
+            <label><input type="radio" value="TRANSFER_AGENT" {...form.register('paymentMethod')} /><span><b>Переводом / связаться с агентом</b><small>Менеджер уточнит реквизиты</small></span></label>
+            {form.formState.errors.paymentMethod && <small className="field-error">{form.formState.errors.paymentMethod.message}</small>}
+          </fieldset>
           <label className="field"><span>Комментарий <em>необязательно</em></span><textarea rows={2} placeholder="Пожелания к доставке" {...form.register('comment')} /></label>
           {mutation.isError && <p className="form-error">{errorMessage(mutation.error)}</p>}
           <button className="button button-primary button-full" disabled={mutation.isPending}>

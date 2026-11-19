@@ -15,6 +15,8 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
+  imageUrl?: string | null;
+  imageKey?: string | null;
   _count?: { products: number };
 }
 
@@ -25,6 +27,7 @@ export interface Product {
   description: string;
   imageUrl: string | null;
   imageUrls?: string[];
+  imageKeys?: string[];
   costPrice?: string;
   recommendedPrice: string;
   minimumPrice?: string;
@@ -53,6 +56,9 @@ export interface Order {
   customerName: string;
   customerPhone: string;
   deliveryAddress: string;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
+  paymentMethod: 'CASH' | 'CARD_ON_DELIVERY' | 'TRANSFER_AGENT';
   comment: string | null;
   status: OrderStatus;
   totalAmount: string;

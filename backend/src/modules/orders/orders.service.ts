@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus, Prisma, ProductStatus, UserRole } from '@prisma/client';
+import { OrderStatus, PaymentMethod, Prisma, ProductStatus, UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../../common/auth/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TelegramService } from '../telegram/telegram.service';
@@ -148,6 +148,9 @@ export class OrdersService {
               customerName: input.customerName.trim(),
               customerPhone: input.customerPhone,
               deliveryAddress: input.deliveryAddress.trim(),
+              deliveryLatitude: input.deliveryLatitude,
+              deliveryLongitude: input.deliveryLongitude,
+              paymentMethod: input.paymentMethod ?? PaymentMethod.CASH,
               comment: input.comment?.trim() || null,
               totalAmount,
               totalCost,

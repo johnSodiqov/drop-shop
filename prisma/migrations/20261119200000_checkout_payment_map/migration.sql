@@ -1,0 +1,6 @@
+CREATE TYPE "PaymentMethod" AS ENUM ('CASH', 'CARD_ON_DELIVERY', 'TRANSFER_AGENT');
+
+ALTER TABLE "Order"
+  ADD COLUMN "deliveryLatitude" DOUBLE PRECISION,
+  ADD COLUMN "deliveryLongitude" DOUBLE PRECISION,
+  ADD COLUMN "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'CASH';

@@ -19,6 +19,11 @@ export function OrdersPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['orders'] }),
   });
   const createdNumber = (location.state as { createdOrder?: number } | null)?.createdOrder;
+  const paymentLabels = {
+    CASH: 'Наличными',
+    CARD_ON_DELIVERY: 'Картой при получении',
+    TRANSFER_AGENT: 'Переводом / связаться с агентом',
+  };
   const transitions: Record<OrderStatus, OrderStatus[]> = {
     NEW: ['CONFIRMED', 'CANCELLED'],
     CONFIRMED: ['PACKING', 'CANCELLED'],
@@ -39,7 +44,7 @@ export function OrdersPage() {
                 <div><span className="eyebrow">ЗАКАЗ №{order.orderNumber}</span><p className="muted">{new Date(order.createdAt).toLocaleString('ru-RU')}</p></div>
                 <span className={`status-badge status-${order.status.toLowerCase()}`}>{statusLabels[order.status]}</span>
               </div>
-              {user?.role === 'ADMIN' && <div className="order-customer"><b>{order.customerName}</b><span>{order.customerPhone}</span><span>{order.deliveryAddress}</span></div>}
+              {user?.role === 'ADMIN' && <div className="order-customer"><b>{order.customerName}</b><span>{order.customerPhone}</span><span>{order.deliveryAddress}</span><span>{paymentLabels[order.paymentMethod]}</span></div>}
               <div className="order-items">{order.items.map((item) => <div key={item.id}><span>{item.productName} × {item.quantity}</span><b>{formatMoney(Number(item.salePrice) * item.quantity)}</b></div>)}</div>
               <div className="order-card-footer"><strong>{formatMoney(order.totalAmount)}</strong>{user?.role === 'AGENT' && <span className="agent-profit">Прибыль {formatMoney(order.totalProfit)}</span>}
                 {user?.role === 'ADMIN' && transitions[order.status].length > 0 && (

@@ -24,7 +24,12 @@ export class CategoriesService {
       .replace(/^-|-$/g, '');
     try {
       return await this.prisma.category.create({
-        data: { name, slug: `${slugBase || 'category'}-${randomUUID().slice(0, 8)}` },
+        data: {
+          name,
+          slug: `${slugBase || 'category'}-${randomUUID().slice(0, 8)}`,
+          imageUrl: input.imageUrl,
+          imageKey: input.imageKey,
+        },
       });
     } catch (error) {
       if (this.isUniqueViolation(error)) throw new ConflictException('Category already exists');
@@ -37,7 +42,11 @@ export class CategoriesService {
     if (!category) throw new NotFoundException('Category not found');
     return this.prisma.category.update({
       where: { id },
-      data: { name: input.name.trim() },
+      data: {
+        name: input.name.trim(),
+        ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
+        ...(input.imageKey !== undefined ? { imageKey: input.imageKey } : {}),
+      },
     });
   }
 

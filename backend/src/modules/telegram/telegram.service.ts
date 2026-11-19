@@ -168,6 +168,7 @@ export class TelegramService {
       `Покупатель: ${this.escape(order.customerName)}`,
       `Телефон: ${this.escape(order.customerPhone)}`,
       `Адрес: ${this.escape(order.deliveryAddress)}`,
+      `Способ оплаты: ${this.escape({ CASH: 'Наличными', CARD_ON_DELIVERY: 'Картой при получении', TRANSFER_AGENT: 'Переводом / связаться с агентом' }[order.paymentMethod])}`,
       `Товары:\n${items}`,
       `Закупочная стоимость: ${order.totalCost.toFixed(2)} UZS`,
       `Сумма продажи: ${order.totalAmount.toFixed(2)} UZS`,

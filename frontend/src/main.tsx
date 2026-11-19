@@ -6,6 +6,7 @@ import App from './App';
 import { AuthProvider } from './features/auth/AuthProvider';
 import { CartProvider } from './features/cart/CartProvider';
 import './styles.css';
+import 'leaflet/dist/leaflet.css';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },

@@ -1,0 +1,3 @@
+ALTER TABLE "Product" ADD COLUMN "imageKeys" TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "Category" ADD COLUMN "imageUrl" TEXT;
+ALTER TABLE "Category" ADD COLUMN "imageKey" TEXT;

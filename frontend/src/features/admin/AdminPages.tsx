@@ -112,8 +112,6 @@ const productSchema = z.object({
   recommendedPrice: money,
   minimumPrice: money,
   maximumMarkup: money,
-  imageUrl: z.string().url('Укажите HTTPS-ссылку на изображение').or(z.literal('')),
-  imageUrlsText: z.string().optional(),
   stock: z.coerce.number().int().min(0).max(1_000_000),
   allowAgentPriceChange: z.boolean(),
   status: z.enum(['ACTIVE', 'HIDDEN', 'ARCHIVED', 'OUT_OF_STOCK']).optional(),
@@ -128,6 +126,100 @@ const productSchema = z.object({
 type ProductValues = z.output<typeof productSchema>;
 type ProductFormInput = z.input<typeof productSchema>;
 
+interface MediaItem {
+  url: string;
+  key: string;
+}
+
+function MediaUploader({
+  directory,
+  value,
+  onChange,
+  multiple = true,
+}: {
+  directory: 'products' | 'categories' | 'banners' | 'brands';
+  value: MediaItem[];
+  onChange: (items: MediaItem[]) => void;
+  multiple?: boolean;
+}) {
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    setError('');
+    setUploading(true);
+    setProgress(0);
+    const form = new FormData();
+    Array.from(files).forEach((file) => form.append(multiple ? 'files' : 'file', file));
+    try {
+      const endpoint = multiple ? '/storage/upload/multiple' : '/storage/upload';
+      const response = await api.post<{ success: boolean; data: MediaItem | MediaItem[] }>(
+        `${endpoint}?directory=${directory}`,
+        form,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (event) => setProgress(event.total ? Math.round((event.loaded * 100) / event.total) : 0),
+        },
+      );
+      const uploaded = Array.isArray(response.data.data) ? response.data.data : [response.data.data];
+      onChange(multiple ? [...value, ...uploaded] : uploaded);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function remove(item: MediaItem) {
+    const parts = item.key.split('/');
+    if (parts.length !== 2) return;
+    try {
+      await api.delete(`/storage/${parts[0]}/${parts[1]}`);
+      onChange(value.filter((candidate) => candidate.key !== item.key));
+    } catch (reason) {
+      setError(errorMessage(reason));
+    }
+  }
+
+  function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= value.length) return;
+    const next = [...value];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  }
+
+  return (
+    <div className="media-uploader field-span">
+      <div className="media-upload-actions">
+        <label className="button button-outline">
+          Выбрать изображения
+          <input type="file" accept="image/jpeg,image/png,image/webp" multiple={multiple} onChange={(event) => void upload(event.target.files)} />
+        </label>
+        {uploading && <span className="upload-progress">Загрузка: {progress}%</span>}
+      </div>
+      {value.length > 0 && (
+        <div className="media-preview-list">
+          {value.map((item, index) => (
+            <div className="media-preview" key={item.key}>
+              <img src={item.url} alt="" loading="lazy" />
+              {index === 0 && <span className="media-main-label">Главное</span>}
+              <div className="media-preview-actions">
+                <button type="button" disabled={index === 0} onClick={() => move(index, -1)}>←</button>
+                <button type="button" disabled={index === value.length - 1} onClick={() => move(index, 1)}>→</button>
+                <button type="button" onClick={() => void remove(item)}>Удалить</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {error && <p className="form-error">{error}</p>}
+    </div>
+  );
+}
+
 function ProductForm({
   categories,
   product,
@@ -138,6 +230,19 @@ function ProductForm({
   close: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [media, setMedia] = useState<MediaItem[]>(
+    (() => {
+      const urls = product?.imageUrls?.length
+        ? product.imageUrls
+        : product?.imageUrl
+          ? [product.imageUrl]
+          : [];
+      return urls.map((url, index) => ({
+        url,
+        key: product?.imageKeys?.[index] ?? '',
+      })).filter((item) => item.url);
+    })(),
+  );
   const form = useForm<ProductFormInput, unknown, ProductValues>({
     resolver: zodResolver(productSchema),
     defaultValues: product
@@ -150,21 +255,19 @@ function ProductForm({
           recommendedPrice: product.recommendedPrice,
           minimumPrice: product.minimumPrice ?? '0',
           maximumMarkup: product.maximumMarkup ?? '0',
-          imageUrl: product.imageUrl ?? '',
-          imageUrlsText: product.imageUrls?.join('\n') ?? '',
           stock: product.inventory?.quantity ?? 0,
           allowAgentPriceChange: product.allowAgentPriceChange ?? true,
           status: product.status as ProductValues['status'],
         }
-      : { allowAgentPriceChange: true, stock: 0, imageUrl: '' },
+      : { allowAgentPriceChange: true, stock: 0 },
   });
   const mutation = useMutation({
     mutationFn: async (values: ProductValues) => {
-      const { imageUrl, imageUrlsText, ...rest } = values;
       const payload = {
-        ...rest,
-        imageUrl: imageUrl || undefined,
-        imageUrls: imageUrlsText?.split(/\r?\n/).map((url) => url.trim()).filter(Boolean) ?? [],
+        ...values,
+        imageUrl: media[0]?.url || undefined,
+        imageUrls: media.map((item) => item.url),
+        imageKeys: media.map((item) => item.key).filter(Boolean),
       };
       return product
         ? api.patch(`/admin/products/${product.id}`, payload)
@@ -185,8 +288,7 @@ function ProductForm({
           <label className="field"><span>Название</span><input {...form.register('name')} /></label>
           <label className="field field-span"><span>Описание</span><textarea rows={3} {...form.register('description')} /></label>
           <label className="field"><span>Категория</span><select {...form.register('categoryId')}><option value="">Выберите</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
-          <label className="field"><span>Изображение (HTTPS)</span><input placeholder="https://…" {...form.register('imageUrl')} /></label>
-          <label className="field field-span"><span>Дополнительные фотографии (HTTPS, по одной ссылке на строку)</span><textarea rows={2} placeholder="https://…" {...form.register('imageUrlsText')} /></label>
+          <MediaUploader directory="products" value={media} onChange={setMedia} />
           <label className="field"><span>Закупочная цена</span><input inputMode="decimal" {...form.register('costPrice')} /></label>
           <label className="field"><span>Минимальная цена</span><input inputMode="decimal" {...form.register('minimumPrice')} /></label>
           <label className="field"><span>Рекомендованная цена</span><input inputMode="decimal" {...form.register('recommendedPrice')} /></label>
@@ -233,23 +335,51 @@ export function AdminCategoriesPage() {
   const queryClient = useQueryClient();
   const categories = useQuery({ queryKey: ['categories'], queryFn: async () => (await api.get<Category[]>('/categories')).data });
   const form = useForm<{ name: string }>({ resolver: zodResolver(categorySchema) });
+  const [categoryMedia, setCategoryMedia] = useState<MediaItem[]>([]);
+  const [categoryError, setCategoryError] = useState('');
   const add = useMutation({
-    mutationFn: (values: { name: string }) => api.post('/categories', values),
-    onSuccess: async () => { form.reset(); await queryClient.invalidateQueries({ queryKey: ['categories'] }); },
+    mutationFn: (values: { name: string }) => api.post('/categories', {
+      ...values,
+      imageUrl: categoryMedia[0]?.url,
+      imageKey: categoryMedia[0]?.key,
+    }),
+    onSuccess: async () => { form.reset(); setCategoryMedia([]); await queryClient.invalidateQueries({ queryKey: ['categories'] }); },
   });
   const remove = useMutation({
     mutationFn: (id: string) => api.delete(`/categories/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
   });
   const rename = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) => api.patch(`/categories/${id}`, { name }),
+    mutationFn: ({ id, name, imageUrl, imageKey }: { id: string; name: string; imageUrl?: string | null; imageKey?: string | null }) => api.patch(`/categories/${id}`, { name, imageUrl: imageUrl || undefined, imageKey: imageKey || undefined }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
   });
+  async function uploadCategoryImage(category: Category, files: FileList | null) {
+    if (!files?.[0]) return;
+    setCategoryError('');
+    const formData = new FormData();
+    formData.append('file', files[0]);
+    try {
+      const response = await api.post<{ data: MediaItem }>(
+        '/storage/upload?directory=categories',
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      await api.patch(`/categories/${category.id}`, {
+        name: category.name,
+        imageUrl: response.data.data.url,
+        imageKey: response.data.data.key,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+    } catch (reason) {
+      setCategoryError(errorMessage(reason));
+    }
+  }
   return <PageContainer><div className="page-heading"><span className="eyebrow">КАТАЛОГ</span><h1>Категории</h1><p>Категории помогают покупателям находить нужные товары.</p></div>
-    <form className="inline-form" onSubmit={form.handleSubmit((values) => add.mutate(values))}><label className="field"><span>Название категории</span><input placeholder="Например, Для дома" {...form.register('name')} /></label><button className="button button-primary" disabled={add.isPending}>{add.isPending ? 'Добавляем…' : 'Добавить категорию'}</button></form>
+    <form className="inline-form" onSubmit={form.handleSubmit((values) => add.mutate(values))}><label className="field"><span>Название категории</span><input placeholder="Например, Для дома" {...form.register('name')} /></label><MediaUploader directory="categories" value={categoryMedia} onChange={setCategoryMedia} multiple={false} /><button className="button button-primary" disabled={add.isPending}>{add.isPending ? 'Добавляем…' : 'Добавить категорию'}</button></form>
+    {categoryError && <p className="form-error">{categoryError}</p>}
     {add.isError && <p className="form-error">{errorMessage(add.error)}</p>}{remove.isError && <p className="form-error">{errorMessage(remove.error)}</p>}
     {categories.isPending ? <LoadingState /> : categories.isError ? <ErrorState message={errorMessage(categories.error)} /> : !categories.data?.length ? <EmptyState label="Категории ещё не созданы." />
-      : <div className="category-list">{categories.data.map((category) => <div className="category-row" key={category.id}><div><b>{category.name}</b><span>{category._count?.products ?? 0} товаров</span></div><div className="category-actions"><button className="button-icon" title="Переименовать категорию" onClick={() => { const name = window.prompt('Новое название категории', category.name)?.trim(); if (name && name !== category.name) rename.mutate({ id: category.id, name }); }}><Pencil size={16} /></button><button className="button-icon danger-icon" title="Удалить категорию" onClick={() => { if (window.confirm(`Удалить категорию «${category.name}»?`)) remove.mutate(category.id); }}><Trash2 size={17} /></button></div></div>)}</div>}
+      : <div className="category-list">{categories.data.map((category) => <div className="category-row" key={category.id}><div>{category.imageUrl && <img className="category-image" src={category.imageUrl} alt="" loading="lazy" />}<b>{category.name}</b><span>{category._count?.products ?? 0} товаров</span></div><div className="category-actions"><label className="button-icon" title="Загрузить изображение"><span>+</span><input className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadCategoryImage(category, event.target.files)} /></label><button className="button-icon" title="Переименовать категорию" onClick={() => { const name = window.prompt('Новое название категории', category.name)?.trim(); if (name && name !== category.name) rename.mutate({ id: category.id, name, imageUrl: category.imageUrl, imageKey: category.imageKey }); }}><Pencil size={16} /></button><button className="button-icon danger-icon" title="Удалить категорию" onClick={() => { if (window.confirm(`Удалить категорию «${category.name}»?`)) remove.mutate(category.id); }}><Trash2 size={17} /></button></div></div>)}</div>}
     {rename.isError && <p className="form-error">{errorMessage(rename.error)}</p>}
   </PageContainer>;
 }

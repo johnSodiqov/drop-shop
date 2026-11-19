@@ -5,6 +5,8 @@ import {
   IsArray,
   IsInt,
   IsOptional,
+  IsEnum,
+  IsNumber,
   IsString,
   IsUUID,
   Matches,
@@ -14,6 +16,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { PaymentMethod } from '@prisma/client';
 
 export class OrderLineDto {
   @IsString()
@@ -51,6 +54,18 @@ export class CreateOrderDto {
   @MinLength(5)
   @MaxLength(500)
   deliveryAddress!: string;
+
+  @IsOptional()
+  @IsNumber()
+  deliveryLatitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  deliveryLongitude?: number;
+
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
 
   @IsOptional()
   @IsString()

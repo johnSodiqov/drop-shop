@@ -13,6 +13,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { validateEnvironment } from './config/environment';
 import { HealthController } from './health/health.controller';
+import { StorageModule } from './modules/storage/storage.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { HealthController } from './health/health.controller';
     TelegramModule,
     InventoryModule,
     PricingModule,
+    StorageModule,
   ],
   controllers: [HealthController],
   providers: [],
