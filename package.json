@@ -22,6 +22,8 @@
     "concurrently": "^9.1.2"
   },
   "dependencies": {
+    "@nestjs/common": "12.3.3",
+    "@nestjs/core": "12.3.3",
     "@neon/config": "^1.14.4",
     "@neon/env": "^2.1.7"
   }

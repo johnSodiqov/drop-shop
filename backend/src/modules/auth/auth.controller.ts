@@ -14,25 +14,13 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthenticatedUser, CurrentUser } from '../../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { AuthService } from './auth.service';
+import { getRefreshCookieOptions } from './auth-cookie-options';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
-const REFRESH_COOKIE = 'dropstore_refresh';
+export { getRefreshCookieOptions } from './auth-cookie-options';
 
-export function getRefreshCookieOptions(nodeEnv: unknown): {
-  httpOnly: true;
-  secure: boolean;
-  sameSite: 'strict' | 'none';
-  path: string;
-} {
-  const isProduction = nodeEnv === 'production';
-  return {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'strict',
-    path: '/api/v1/auth',
-  };
-}
+const REFRESH_COOKIE = 'dropstore_refresh';
 
 @ApiTags('auth')
 @Controller('auth')

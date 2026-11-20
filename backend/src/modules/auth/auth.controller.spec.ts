@@ -1,4 +1,4 @@
-import { getRefreshCookieOptions } from './auth.controller';
+import { getRefreshCookieOptions } from './auth-cookie-options';
 
 describe('refresh cookie options', () => {
   it('uses cross-site secure cookies in production', () => {
