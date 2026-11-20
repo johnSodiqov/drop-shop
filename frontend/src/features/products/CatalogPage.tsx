@@ -104,7 +104,7 @@ export function CatalogPage() {
           {categories.data?.map((category) => <button key={category.id} className={categoryId === category.id ? 'category-filter active' : 'category-filter'} onClick={() => setCategoryId(category.id)}>{category.name}</button>)}
         </div>
         {products.isPending ? <LoadingState /> : products.isError
-          ? <ErrorState message={errorMessage(products.error)} retry={() => void products.refetch()} />
+          ? <ErrorState message={errorMessage(products.error)} retry={() => products.refetch()} />
           : products.data?.length
             ? <div className="product-grid">{products.data.map((product) => <ProductCard key={product.id} product={product} agentMode={agentMode} />)}</div>
             : <EmptyState label="Товары не найдены. Попробуйте изменить поиск или категорию." />}

@@ -24,7 +24,7 @@ interface DashboardData {
 export function AdminDashboardPage() {
   const query = useQuery({ queryKey: ['admin-dashboard'], queryFn: async () => (await api.get<DashboardData>('/admin/dashboard')).data });
   if (query.isPending) return <PageContainer><LoadingState /></PageContainer>;
-  if (query.isError) return <PageContainer><ErrorState message={errorMessage(query.error)} retry={() => void query.refetch()} /></PageContainer>;
+  if (query.isError) return <PageContainer><ErrorState message={errorMessage(query.error)} retry={() => query.refetch()} /></PageContainer>;
   const data = query.data;
   const quickActions = [
     { title: 'Новый товар', description: 'Добавить позицию в каталог', href: '/admin/products' },
@@ -319,7 +319,7 @@ export function AdminProductsPage() {
   return (
     <PageContainer>
       <div className="page-heading heading-with-action"><div><span className="eyebrow">КАТАЛОГ</span><h1>Товары</h1><p>Управление ценами, наличием и карточками товаров.</p></div><button className="button button-primary" onClick={() => setEditing(null)}><PackagePlus size={17} /> Добавить товар</button></div>
-      {(products.isPending || categories.isPending) ? <LoadingState /> : products.isError ? <ErrorState message={errorMessage(products.error)} retry={() => void products.refetch()} />
+      {(products.isPending || categories.isPending) ? <LoadingState /> : products.isError ? <ErrorState message={errorMessage(products.error)} retry={() => products.refetch()} />
         : !products.data?.length ? <EmptyState label="Товаров пока нет. Добавьте первый товар." />
           : <div className="table-wrap"><table><thead><tr><th>Товар</th><th>Категория</th><th>Закупка</th><th>Рекоменд.</th><th>Остаток</th><th>Статус</th><th /></tr></thead><tbody>
             {products.data.map((product) => <tr key={product.id}><td><div className="table-product"><b>{product.name}</b><small>{product.sku}</small></div></td><td>{product.category.name}</td><td>{formatMoney(product.costPrice ?? '0')}</td><td>{formatMoney(product.recommendedPrice)}</td><td>{product.inventory?.quantity ?? 0}</td><td><span className={`status-badge status-${product.status.toLowerCase()}`}>{product.status === 'ACTIVE' ? 'Активен' : product.status === 'HIDDEN' ? 'Скрыт' : product.status === 'ARCHIVED' ? 'Архив' : 'Нет в наличии'}</span></td><td className="table-actions"><button className="button-icon" aria-label={`Изменить ${product.name}`} onClick={() => setEditing(product)}><Pencil size={16} /></button><button className="button-icon danger-icon" aria-label={`Архивировать ${product.name}`} onClick={() => { if (window.confirm(`Архивировать «${product.name}»?`)) remove.mutate(product.id); }}><Trash2 size={16} /></button></td></tr>)}
@@ -392,7 +392,7 @@ export function AdminUsersPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
   });
   return <PageContainer><div className="page-heading"><span className="eyebrow">УПРАВЛЕНИЕ ДОСТУПОМ</span><h1>Пользователи и агенты</h1><p>Роль назначается администратором. Только активные пользователи могут входить.</p></div>
-    {users.isPending ? <LoadingState /> : users.isError ? <ErrorState message={errorMessage(users.error)} retry={() => void users.refetch()} /> : !users.data?.length ? <EmptyState label="Пользователей пока нет." />
+    {users.isPending ? <LoadingState /> : users.isError ? <ErrorState message={errorMessage(users.error)} retry={() => users.refetch()} /> : !users.data?.length ? <EmptyState label="Пользователей пока нет." />
       : <div className="table-wrap"><table><thead><tr><th>Пользователь</th><th>Телефон</th><th>Роль</th><th>Аккаунт</th><th>Регистрация</th></tr></thead><tbody>
         {users.data.map((user) => <tr key={user.id}><td><div className="table-product"><b>{user.name}</b><small>{user.agentProfile?.referralCode ?? '—'}</small></div></td><td>{user.phone}</td>
           <td><select aria-label={`Роль для ${user.name}`} value={user.role} disabled={update.isPending} onChange={(event) => update.mutate({ id: user.id, values: { role: event.target.value } })}><option value="CUSTOMER">Покупатель</option><option value="AGENT">Агент</option><option value="ADMIN">Администратор</option></select></td>
@@ -407,7 +407,7 @@ interface AgentSales { id: string; name: string; phone: string; isActive: boolea
 export function AdminAgentsPage() {
   const query = useQuery({ queryKey: ['admin-agents'], queryFn: async () => (await api.get<AgentSales[]>('/admin/agents')).data });
   return <PageContainer><div className="page-heading"><span className="eyebrow">ПАРТНЁРСКАЯ СЕТЬ</span><h1>Продажи агентов</h1><p>Показатели рассчитаны по всем заказам, кроме отменённых.</p></div>
-    {query.isPending ? <LoadingState /> : query.isError ? <ErrorState message={errorMessage(query.error)} retry={() => void query.refetch()} /> : !query.data?.length ? <EmptyState label="Агентов с продажами пока нет." />
+    {query.isPending ? <LoadingState /> : query.isError ? <ErrorState message={errorMessage(query.error)} retry={() => query.refetch()} /> : !query.data?.length ? <EmptyState label="Агентов с продажами пока нет." />
       : <div className="table-wrap"><table><thead><tr><th>Агент</th><th>Телефон</th><th>Заказы</th><th>Продажи</th><th>Прибыль</th><th>Аккаунт</th></tr></thead><tbody>{query.data.map((agent) => <tr key={agent.id}><td><b>{agent.name}</b></td><td>{agent.phone}</td><td>{agent.ordersCount}</td><td>{formatMoney(agent.sales)}</td><td className="agent-profit">{formatMoney(agent.profit)}</td><td>{agent.isActive ? 'Активен' : 'Заблокирован'}</td></tr>)}</tbody></table></div>}
   </PageContainer>;
 }
@@ -450,7 +450,7 @@ function AdminNotifications() {
   });
   return <section className="notifications-section">
     <div className="panel-heading notifications-heading"><div><h2>История Telegram-уведомлений</h2><p>Сбойные сообщения можно отправить повторно.</p></div></div>
-    {query.isPending ? <LoadingState /> : query.isError ? <ErrorState message={errorMessage(query.error)} retry={() => void query.refetch()} />
+    {query.isPending ? <LoadingState /> : query.isError ? <ErrorState message={errorMessage(query.error)} retry={() => query.refetch()} />
       : !query.data?.length ? <EmptyState label="Уведомлений пока нет." />
         : <div className="table-wrap"><table><thead><tr><th>Заказ</th><th>Событие</th><th>Состояние</th><th>Попытки</th><th>Последняя ошибка</th><th /></tr></thead><tbody>
           {query.data.map((item) => <tr key={item.id}><td>№{item.order.orderNumber} · {item.order.customerName}</td><td>{item.event === 'ORDER_CREATED' ? 'Новый заказ' : item.event === 'ORDER_CANCELLED' ? 'Отмена' : 'Изменение статуса'}</td>

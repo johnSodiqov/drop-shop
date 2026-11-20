@@ -1,25 +1,17 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus, PaymentMethod, Prisma, ProductStatus, UserRole } from '@prisma/client';
+import { OrderStatus, OrderStatusSource, PaymentMethod, Prisma, ProductStatus, UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../../common/auth/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { PricingService } from '../pricing/pricing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
-
-const transitions: Record<OrderStatus, OrderStatus[]> = {
-  NEW: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-  CONFIRMED: [OrderStatus.PACKING, OrderStatus.CANCELLED],
-  PACKING: [OrderStatus.DELIVERY, OrderStatus.CANCELLED],
-  DELIVERY: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
-  DELIVERED: [],
-  CANCELLED: [],
-};
 
 @Injectable()
 export class OrdersService {
@@ -206,7 +198,13 @@ export class OrdersService {
             : { customerId: user.id }),
         ...(status ? { status } : {}),
       },
-      include: { items: true, statusHistory: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        items: true,
+        statusHistory: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, name: true } } },
+        },
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -216,7 +214,13 @@ export class OrdersService {
   async get(id: string, user: AuthenticatedUser) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { items: true, statusHistory: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        items: true,
+        statusHistory: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, name: true } } },
+        },
+      },
     });
     if (!order) throw new NotFoundException('Order not found');
     if (
@@ -229,7 +233,28 @@ export class OrdersService {
     return this.hideFinancialsFromCustomer(order, user);
   }
 
-  async changeStatus(id: string, nextStatus: OrderStatus, actorId: string) {
+  async getByOrderNumber(orderNumber: number, user: AuthenticatedUser) {
+    if (user.role !== UserRole.ADMIN) throw new ForbiddenException('Administrator role is required');
+    const order = await this.prisma.order.findUnique({
+      where: { orderNumber },
+      include: {
+        items: true,
+        statusHistory: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, name: true } } },
+        },
+      },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
+
+  async changeStatus(
+    id: string,
+    nextStatus: OrderStatus,
+    actorId: string,
+    source: OrderStatusSource = OrderStatusSource.WEB,
+  ) {
     const updated = await this.prisma.$transaction(
       async (tx) => {
         const order = await tx.order.findUnique({
@@ -237,9 +262,7 @@ export class OrdersService {
           include: { items: true },
         });
         if (!order) throw new NotFoundException('Order not found');
-        if (!transitions[order.status].includes(nextStatus)) {
-          throw new BadRequestException(`Cannot change order status from ${order.status} to ${nextStatus}`);
-        }
+        if (order.status === nextStatus) throw new BadRequestException(`Order already has status ${nextStatus}`);
 
         const changed = await tx.order.updateMany({
           where: { id, status: order.status },
@@ -248,29 +271,41 @@ export class OrdersService {
         if (changed.count !== 1) throw new ConflictException('Order status has changed; reload and try again');
 
         await tx.orderStatusHistory.create({
-          data: { orderId: id, changedBy: actorId, from: order.status, to: nextStatus },
+          data: { orderId: id, changedBy: actorId, from: order.status, to: nextStatus, source },
         });
 
         if (nextStatus === OrderStatus.CANCELLED) {
           for (const item of order.items) {
             await this.inventoryService.restore(tx, item, order);
           }
+        } else if (order.status === OrderStatus.CANCELLED) {
+          for (const item of order.items) {
+            await this.inventoryService.reserve(tx, item, order.id, order.orderNumber);
+          }
         }
 
-        await tx.notificationLog.create({
-          data: {
-            orderId: id,
-            event: nextStatus === OrderStatus.CANCELLED ? 'ORDER_CANCELLED' : 'ORDER_STATUS_CHANGED',
-          },
-        });
+        if (source === OrderStatusSource.WEB) {
+          await tx.notificationLog.create({
+            data: {
+              orderId: id,
+              event: nextStatus === OrderStatus.CANCELLED ? 'ORDER_CANCELLED' : 'ORDER_STATUS_CHANGED',
+            },
+          });
+        }
         return tx.order.findUniqueOrThrow({
           where: { id },
-          include: { items: true, statusHistory: { orderBy: { createdAt: 'asc' } } },
+          include: {
+            items: true,
+            statusHistory: {
+              orderBy: { createdAt: 'asc' },
+              include: { user: { select: { id: true, name: true } } },
+            },
+          },
         });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
-    void this.telegram.dispatchOrder(id);
+    if (source === OrderStatusSource.WEB) void this.telegram.dispatchOrder(id);
     return updated;
   }
 
@@ -282,12 +317,12 @@ export class OrdersService {
     totalCost: Prisma.Decimal;
     totalProfit: Prisma.Decimal;
     items: Array<{ costPrice: Prisma.Decimal; profit: Prisma.Decimal }>;
-  }>(order: T, user: AuthenticatedUser): T | object {
+  }>(order: T, user: AuthenticatedUser): T {
     if (user.role !== UserRole.CUSTOMER) return order;
     const { totalCost: _cost, totalProfit: _profit, ...publicOrder } = order;
     return {
       ...publicOrder,
       items: order.items.map(({ costPrice: _itemCost, profit: _itemProfit, ...item }) => item),
-    };
+    } as T;
   }
 }

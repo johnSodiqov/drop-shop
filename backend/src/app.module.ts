@@ -14,6 +14,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
 import { validateEnvironment } from './config/environment';
 import { HealthController } from './health/health.controller';
 import { StorageModule } from './modules/storage/storage.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { StorageModule } from './modules/storage/storage.module';
       envFilePath: ['../.env', '.env'],
       validate: validateEnvironment,
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     UsersModule,

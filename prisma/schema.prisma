@@ -28,6 +28,11 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum OrderStatusSource {
+  WEB
+  TELEGRAM
+}
+
 enum NotificationStatus {
   PENDING
   PROCESSING
@@ -49,6 +54,10 @@ model User {
   role            UserRole       @default(CUSTOMER)
   isActive        Boolean        @default(true)
   refreshTokenHash String?
+  telegramUserId String? @unique
+  telegramChatId String?
+  telegramLinkCodeHash String?
+  telegramLinkExpiresAt DateTime? @db.Timestamptz(3)
   createdAt       DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
   agentProfile    AgentProfile?
@@ -182,6 +191,7 @@ model OrderStatusHistory {
   changedBy String
   from      OrderStatus
   to        OrderStatus
+  source    OrderStatusSource @default(WEB)
   createdAt    DateTime    @default(now()) @db.Timestamptz(3)
   order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [changedBy], references: [id], onDelete: Restrict)

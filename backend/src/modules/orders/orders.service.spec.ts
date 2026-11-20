@@ -37,6 +37,7 @@ describe('OrdersService critical stock rules', () => {
           inventory: { quantity: 3 },
         }]),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       order: {
         create: jest.fn().mockImplementation(({ data }) => ({
@@ -103,6 +104,7 @@ describe('OrdersService critical stock rules', () => {
           inventory: { quantity: 2 },
         }]),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       order: {
         create: jest.fn().mockImplementation(({ data }) => ({

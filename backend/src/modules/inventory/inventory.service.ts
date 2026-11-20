@@ -28,9 +28,14 @@ export class InventoryService {
       where: { productId: item.productId },
     });
     if (remaining.quantity === 0) {
-      await tx.product.update({
-        where: { id: item.productId },
+      await tx.product.updateMany({
+        where: { id: item.productId, status: ProductStatus.ACTIVE },
         data: { status: ProductStatus.OUT_OF_STOCK },
+      });
+    } else {
+      await tx.product.updateMany({
+        where: { id: item.productId, status: ProductStatus.OUT_OF_STOCK },
+        data: { status: ProductStatus.ACTIVE },
       });
     }
   }

@@ -21,7 +21,7 @@ export function AgentDashboardPage() {
   const { user } = useAuth();
   const stats = useQuery({ queryKey: ['agent-dashboard'], queryFn: async () => (await api.get<AgentStats>('/agent/dashboard')).data });
   if (stats.isPending) return <PageContainer><LoadingState /></PageContainer>;
-  if (stats.isError) return <PageContainer><ErrorState message={errorMessage(stats.error)} retry={() => void stats.refetch()} /></PageContainer>;
+  if (stats.isError) return <PageContainer><ErrorState message={errorMessage(stats.error)} retry={() => stats.refetch()} /></PageContainer>;
   const data = stats.data;
   return <PageContainer><div className="page-heading"><span className="eyebrow">КАБИНЕТ АГЕНТА</span><h1>Здравствуйте, {user?.name}</h1><p>Ваши продажи и прибыль в одном месте.</p></div>
     <div className="stats-grid agent-stats"><Stat icon={<ShoppingBag size={19} />} label="Заказы" value={data.ordersCount} /><Stat icon={<BarChart3 size={19} />} label="Сумма продаж" value={formatMoney(data.salesTotal)} /><Stat icon={<CircleDollarSign size={19} />} label="Прибыль" value={formatMoney(data.profit)} positive /><Stat icon={<PackageCheck size={19} />} label="Доставлено" value={data.deliveredCount} /><Stat icon={<XCircle size={19} />} label="Отменено" value={data.cancelledCount} /></div>
@@ -59,7 +59,7 @@ export function AgentLinksPage() {
   };
   return <PageContainer><div className="page-heading"><span className="eyebrow">ПЕРСОНАЛЬНЫЕ ССЫЛКИ</span><h1>Поделитесь товаром</h1><p>Уникальная ссылка содержит ваш агентский код и ведёт на карточку товара.</p></div>
     {copyError && <p className="form-error">{copyError}</p>}
-    {links.isPending ? <LoadingState /> : links.isError ? <ErrorState message={errorMessage(links.error)} retry={() => void links.refetch()} /> : !links.data?.length ? <EmptyState label="Активных товаров нет." />
+    {links.isPending ? <LoadingState /> : links.isError ? <ErrorState message={errorMessage(links.error)} retry={() => links.refetch()} /> : !links.data?.length ? <EmptyState label="Активных товаров нет." />
       : <div className="table-wrap"><table><thead><tr><th>Товар</th><th>Ссылка</th><th /></tr></thead><tbody>{links.data.map((item) => <tr key={item.id}><td><b>{item.name}</b></td><td><span className="copy-link-text">{item.url}</span></td><td><button className="button button-outline button-small" onClick={() => void copy(item)}><Copy size={15} />{copied === item.id ? 'Скопировано' : 'Копировать'}</button></td></tr>)}</tbody></table></div>}
   </PageContainer>;
 }

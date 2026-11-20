@@ -36,7 +36,7 @@ export function OrdersPage() {
     <PageContainer>
       <div className="page-heading"><span className="eyebrow">{user?.role === 'ADMIN' ? 'УПРАВЛЕНИЕ' : 'ИСТОРИЯ'}</span><h1>{user?.role === 'ADMIN' ? 'Заказы' : 'Мои заказы'}</h1><p>Статусы, детали и история заказов.</p></div>
       {createdNumber && <div className="success-banner"><PackageCheck size={19} /> Заказ №{createdNumber} оформлен. Мы скоро свяжемся с вами.</div>}
-      {orders.isPending ? <LoadingState /> : orders.isError ? <ErrorState message={errorMessage(orders.error)} retry={() => void orders.refetch()} />
+      {orders.isPending ? <LoadingState /> : orders.isError ? <ErrorState message={errorMessage(orders.error)} retry={() => orders.refetch()} />
         : !orders.data?.length ? <EmptyState label="Заказов пока нет." />
           : <div className="orders-list">{orders.data.map((order) => (
             <article className="order-card" key={order.id}>
