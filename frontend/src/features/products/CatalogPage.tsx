@@ -78,6 +78,21 @@ export function CatalogPage() {
           <span className="hero-float float-two">{categoryCount || 0}+ товаров</span>
         </div>
       </section>
+      {!agentMode && categories.data && categories.data.length > 0 && (
+        <section className="home-categories" aria-labelledby="categories-title">
+          <div className="section-heading">
+            <div><span className="eyebrow">DROPSTORE</span><h2 id="categories-title">Популярные категории</h2><p>Подборки товаров для дома и повседневной жизни.</p></div>
+          </div>
+          <div className="category-grid">
+            {categories.data.map((category) => (
+              <button className="category-card" key={category.id} onClick={() => { setCategoryId(category.id); document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' }); }}>
+                {category.imageUrl ? <img src={category.imageUrl} alt="" loading="lazy" /> : <span className="category-card-art"><ShoppingBag size={34} /></span>}
+                <span className="category-card-copy"><strong>{category.name}</strong><span>{category._count?.products ?? 0} товаров <ArrowRight size={16} /></span></span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       <section id="catalog" className="catalog-section">
         <div className="section-heading">
           <div><span className="eyebrow">ПОДБОРКА DROPSTORE</span><h2>Популярные товары</h2><p>Найдите то, что понравится вашим покупателям.</p></div>
@@ -94,6 +109,15 @@ export function CatalogPage() {
             ? <div className="product-grid">{products.data.map((product) => <ProductCard key={product.id} product={product} agentMode={agentMode} />)}</div>
             : <EmptyState label="Товары не найдены. Попробуйте изменить поиск или категорию." />}
       </section>
+      {!agentMode && <section className="benefits-section" aria-labelledby="benefits-title">
+        <div className="benefits-intro"><span className="eyebrow">ПОКУПКИ БЕЗ ЛИШНИХ ШАГОВ</span><h2 id="benefits-title">Всё нужное — в одном месте</h2><p>Удобный каталог помогает быстро найти подходящие товары и оформить заказ.</p></div>
+        <div className="benefits-grid">
+          <article><span className="benefit-number">01</span><strong>Понятный выбор</strong><p>Категории и поиск помогают сориентироваться в ассортименте.</p></article>
+          <article><span className="benefit-number">02</span><strong>Простое оформление</strong><p>Добавьте товары в корзину и укажите данные для заказа.</p></article>
+          <article><span className="benefit-number">03</span><strong>Доставка по адресу</strong><p>Укажите адрес и отметьте точку на карте при оформлении.</p></article>
+          <article><span className="benefit-number">04</span><strong>Поддержка покупателей</strong><p>Оставьте комментарий к заказу, если нужно уточнить детали.</p></article>
+        </div>
+      </section>}
     </PageContainer>
   );
 }
