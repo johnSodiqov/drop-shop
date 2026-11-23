@@ -8,7 +8,7 @@ export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
   @Get()
-  list(@Query('categoryId') categoryId?: string, @Query('search') search?: string, @Query('department') department?: string, @Query('sort') sort?: string, @Query('attributes') attributesJson?: string) {
+  list(@Query('categoryId') categoryId?: string, @Query('search') search?: string, @Query('department') department?: string, @Query('sort') sort?: string, @Query('attributes') attributesJson?: string, @Query('section') section?: string) {
     let attributes: Record<string, string> | undefined;
     if (attributesJson) {
       if (attributesJson.length > 1000) throw new BadRequestException('Too many attribute filters');
@@ -19,7 +19,7 @@ export class ProductsController {
         if (Object.keys(attributes).length > 10) throw new Error('too many attributes');
       } catch { throw new BadRequestException('Invalid attribute filters'); }
     }
-    return this.products.listPublic(categoryId, search?.slice(0, 100), department, sort, attributes);
+    return this.products.listPublic(categoryId, search?.slice(0, 100), department, sort, attributes, section);
   }
 
   @Get(':id')

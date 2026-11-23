@@ -25,7 +25,7 @@ export class AgentController {
   }
 
   @Get('catalog')
-  catalog(@Query('categoryId') categoryId?: string, @Query('search') search?: string, @Query('department') department?: string, @Query('sort') sort?: string, @Query('attributes') attributesJson?: string) {
+  catalog(@Query('categoryId') categoryId?: string, @Query('search') search?: string, @Query('department') department?: string, @Query('sort') sort?: string, @Query('attributes') attributesJson?: string, @Query('section') section?: string) {
     let attributes: Record<string, string> | undefined;
     if (attributesJson) {
       try {
@@ -35,7 +35,7 @@ export class AgentController {
         attributes = parsed as Record<string, string>;
       } catch { throw new BadRequestException('Invalid attribute filters'); }
     }
-    return this.agent.catalog(categoryId, search?.slice(0, 100), department, sort, attributes);
+    return this.agent.catalog(categoryId, search?.slice(0, 100), department, sort, attributes, section);
   }
 
   @Get('catalog/:id')

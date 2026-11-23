@@ -22,6 +22,13 @@ class DepartmentDto {
 class CreateDepartmentDto extends DepartmentDto {
   @IsString() @MinLength(2) @MaxLength(80) declare name: string;
 }
+class SectionDto extends DepartmentDto {
+  @IsOptional() @IsString() departmentId?: string;
+}
+class CreateSectionDto extends SectionDto {
+  @IsString() declare departmentId: string;
+  @IsString() @MinLength(2) @MaxLength(80) declare name: string;
+}
 class CategoryAttributeDto {
   @IsString() key!: string;
   @IsString() @MinLength(1) @MaxLength(80) label!: string;
@@ -87,4 +94,16 @@ export class CategoriesController {
   @Roles(UserRole.ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)
   updateDepartment(@Param('id') id: string, @Body() input: DepartmentDto) { return this.categories.updateDepartment(id, input); }
+
+  @Post('sections')
+  @ApiBearerAuth()
+  @Roles(UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  createSection(@Body() input: CreateSectionDto) { return this.categories.createSection(input as Required<Pick<CreateSectionDto, 'departmentId' | 'name'>> & CreateSectionDto); }
+
+  @Patch('sections/:id')
+  @ApiBearerAuth()
+  @Roles(UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  updateSection(@Param('id') id: string, @Body() input: SectionDto) { return this.categories.updateSection(id, input); }
 }

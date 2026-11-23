@@ -50,7 +50,7 @@ function ProductCard({ product, agentMode }: { product: Product; agentMode: bool
 }
 
 export function CatalogPage() {
-  const { department: departmentSlug, category: categorySlug } = useParams<{ department: string; category: string }>();
+  const { department: departmentSlug, section: sectionOrCategorySlug, category: categorySlug } = useParams<{ department: string; section: string; category: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const agentMode = user?.role === 'AGENT';
@@ -66,19 +66,22 @@ export function CatalogPage() {
     staleTime: 60_000,
   })) });
   const department = departments.data?.find((item) => item.slug === departmentSlug);
+  const selectedSection = department?.sections?.find((section) => section.slug === sectionOrCategorySlug);
+  const effectiveCategorySlug = categorySlug ?? (selectedSection ? undefined : sectionOrCategorySlug);
   useEffect(() => {
-    if (categorySlug && categories.data) setCategoryId(categories.data.find((category) => category.slug === categorySlug)?.id ?? '');
+    if (effectiveCategorySlug && categories.data) setCategoryId(categories.data.find((category) => category.slug === effectiveCategorySlug)?.id ?? '');
     else setCategoryId('');
-  }, [categorySlug, categories.data]);
+  }, [effectiveCategorySlug, categories.data]);
   const products = useQuery({
-    queryKey: ['products', agentMode, categoryId, search, departmentSlug, sort, attributeFilters],
+    queryKey: ['products', agentMode, categoryId, search, departmentSlug, selectedSection?.slug, sort, attributeFilters],
     queryFn: async () => (await api.get<Product[]>(agentMode ? '/agent/catalog' : '/products', {
-      params: { categoryId: categoryId || undefined, search: search || undefined, department: departmentSlug || undefined, sort: sort === 'newest' ? undefined : sort, attributes: Object.keys(attributeFilters).length ? JSON.stringify(attributeFilters) : undefined },
+      params: { categoryId: categoryId || undefined, search: search || undefined, department: departmentSlug || undefined, section: selectedSection?.slug, sort: sort === 'newest' ? undefined : sort, attributes: Object.keys(attributeFilters).length ? JSON.stringify(attributeFilters) : undefined },
     })).data,
   });
   const categoryCount = useMemo(() => categories.data?.reduce((sum, category) => sum + (category._count?.products ?? 0), 0) ?? 0, [categories.data]);
   const selectedCategory = categories.data?.find((category) => category.id === categoryId);
-  const visibleCategories = categories.data?.filter((category) => category.isActive !== false && !category.parentId && (!departmentSlug || category.department?.slug === departmentSlug)).slice(0, departmentSlug ? 30 : 8) ?? [];
+  const visibleSections = department?.sections?.filter((section) => section.isActive !== false) ?? [];
+  const visibleCategories = categories.data?.filter((category) => category.isActive !== false && !category.parentId && (!departmentSlug || category.department?.slug === departmentSlug) && (selectedSection ? category.sectionId === selectedSection.id : !category.sectionId)).slice(0, departmentSlug ? 30 : 8) ?? [];
   return (
     <PageContainer>
       <section className="hero">
@@ -101,20 +104,21 @@ export function CatalogPage() {
             <Link className={`department-card department-${item.slug}`} key={item.id} to={`/catalog/${item.slug}`}>
               {item.imageUrl ? <img className="department-cover" src={item.imageUrl} alt="" loading="lazy" /> : <span className="department-cover department-cover-fallback" aria-hidden="true" />}
               <span className="department-card-content"><span className="eyebrow">ТОРГОВОЕ НАПРАВЛЕНИЕ</span><strong>{item.name}</strong><span>{item.description}</span><b>Перейти в каталог <ArrowRight size={15} /></b></span>
-              <span className="department-categories">{(item.categories ?? []).filter((category) => category.isActive && !category.parentId).slice(0, 4).map((category) => category.name).join(' · ')}</span>
+              <span className="department-categories">{[...(item.sections ?? []).map((section) => section.name), ...(item.categories ?? []).filter((category) => !category.parentId && !category.sectionId).map((category) => category.name)].slice(0, 4).join(' · ')}</span>
               <span className="department-featured">{departmentProducts[index]?.data?.map((product) => <span key={product.id}>{product.name}</span>)}</span>
             </Link>
           ))}
         </section>
       )}
+      {!agentMode && department && !selectedSection && visibleSections.length > 0 && <section className="home-categories catalog-category-section" aria-label="Разделы направления"><div className="section-heading"><div><span className="eyebrow">{department.name}</span><h2>Разделы каталога</h2><p>Сначала выберите раздел, затем категорию товаров.</p></div></div><div className="category-grid">{visibleSections.map((section) => <Link className="category-card" key={section.id} to={`/catalog/${department.slug}/${section.slug}`}>{section.imageUrl ? <img src={section.imageUrl} alt="" loading="lazy" /> : <span className="category-card-art"><ShoppingBag size={34} /></span>}<span className="category-card-copy"><strong>{section.name}</strong><span>{section.categories?.length ?? 0} категорий <ArrowRight size={16} /></span></span></Link>)}</div></section>}
       {!agentMode && visibleCategories.length > 0 && (
         <section className="home-categories" aria-labelledby="categories-title">
           <div className="section-heading">
-            <div><span className="eyebrow">{department?.name ?? 'DROPSTORE'}</span><h2 id="categories-title">{department ? `Категории: ${department.name}` : 'Популярные категории'}</h2><p>{department ? 'Выберите категорию, чтобы перейти к подходящим товарам.' : 'Подборки товаров по всем торговым направлениям.'}</p></div>
+            <div><span className="eyebrow">{selectedSection?.name ?? department?.name ?? 'DROPSTORE'}</span><h2 id="categories-title">{selectedSection ? `Категории: ${selectedSection.name}` : department ? `Категории: ${department.name}` : 'Популярные категории'}</h2><p>{selectedSection || department ? 'Выберите категорию, чтобы перейти к подходящим товарам.' : 'Подборки товаров по всем торговым направлениям.'}</p></div>
           </div>
           <div className="category-grid">
             {visibleCategories.map((category) => (
-              <Link className="category-card" key={category.id} to={`/catalog/${category.department?.slug ?? 'home'}/${category.slug}`}>
+              <Link className="category-card" key={category.id} to={category.section ? `/catalog/${category.department?.slug ?? 'home'}/${category.section.slug}/${category.slug}` : `/catalog/${category.department?.slug ?? 'home'}/${category.slug}`}>
                 {category.imageUrl ? <img src={category.imageUrl} alt="" loading="lazy" /> : <span className="category-card-art"><ShoppingBag size={34} /></span>}
                 <span className="category-card-copy"><strong>{category.name}</strong><span>{category._count?.products ?? 0} товаров <ArrowRight size={16} /></span></span>
               </Link>
@@ -123,15 +127,15 @@ export function CatalogPage() {
         </section>
       )}
       <section id="catalog" className="catalog-section">
-        {department && <nav className="catalog-breadcrumbs" aria-label="Хлебные крошки"><Link to="/">Главная</Link><span>/</span><Link to={`/catalog/${department.slug}`}>{department.name}</Link>{categorySlug && <><span>/</span><span>{categories.data?.find((category) => category.slug === categorySlug)?.name ?? categorySlug}</span></>}</nav>}
+        {department && <nav className="catalog-breadcrumbs" aria-label="Хлебные крошки"><Link to="/">Главная</Link><span>/</span><Link to={`/catalog/${department.slug}`}>{department.name}</Link>{selectedSection && <><span>/</span><Link to={`/catalog/${department.slug}/${selectedSection.slug}`}>{selectedSection.name}</Link></>}{effectiveCategorySlug && <><span>/</span><span>{categories.data?.find((category) => category.slug === effectiveCategorySlug)?.name ?? effectiveCategorySlug}</span></>}</nav>}
         <div className="section-heading">
-          <div><span className="eyebrow">{department?.name ?? 'ПОДБОРКА DROPSTORE'}</span><h2>{department ? `Каталог: ${department.name}` : 'Популярные товары'}</h2><p>{department?.description || 'Найдите то, что понравится вашим покупателям.'}</p></div>
+          <div><span className="eyebrow">{selectedSection?.name ?? department?.name ?? 'ПОДБОРКА DROPSTORE'}</span><h2>{selectedSection ? `Каталог: ${selectedSection.name}` : department ? `Каталог: ${department.name}` : 'Популярные товары'}</h2><p>{selectedSection?.description || department?.description || 'Найдите то, что понравится вашим покупателям.'}</p></div>
           <div className="catalog-search"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Найти товар…" /><SlidersHorizontal size={17} /></div>
         </div>
         {categories.isError && <ErrorState message={errorMessage(categories.error)} />}
         <div className="category-filters">
-          <button className={!categoryId ? 'category-filter active' : 'category-filter'} onClick={() => { setAttributeFilters({}); navigate(departmentSlug ? `/catalog/${departmentSlug}` : '/'); }}>Все товары</button>
-          {categories.data?.filter((category) => category.isActive !== false && (!departmentSlug || category.department?.slug === departmentSlug)).map((category) => <button key={category.id} className={categoryId === category.id ? 'category-filter active' : 'category-filter'} onClick={() => { setAttributeFilters({}); navigate(`/catalog/${category.department?.slug ?? departmentSlug ?? 'home'}/${category.slug}`); }}>{category.name}</button>)}
+          <button className={!categoryId ? 'category-filter active' : 'category-filter'} onClick={() => { setAttributeFilters({}); navigate(selectedSection ? `/catalog/${departmentSlug}/${selectedSection.slug}` : departmentSlug ? `/catalog/${departmentSlug}` : '/'); }}>Все товары</button>
+          {categories.data?.filter((category) => category.isActive !== false && (!departmentSlug || category.department?.slug === departmentSlug) && (selectedSection ? category.sectionId === selectedSection.id : !category.sectionId)).map((category) => <button key={category.id} className={categoryId === category.id ? 'category-filter active' : 'category-filter'} onClick={() => { setAttributeFilters({}); navigate(category.section ? `/catalog/${category.department?.slug ?? departmentSlug ?? 'home'}/${category.section.slug}/${category.slug}` : `/catalog/${category.department?.slug ?? departmentSlug ?? 'home'}/${category.slug}`); }}>{category.name}</button>)}
         </div>
         <div className="catalog-controls">
           <label className="field"><span>Сортировка</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option value="newest">Сначала новые</option><option value="price-asc">Сначала дешевле</option><option value="price-desc">Сначала дороже</option><option value="name">По названию</option></select></label>
@@ -233,7 +237,7 @@ export function ProductDetailsPage() {
   return (
     <PageContainer className="detail-page">
       <Link className="back-link" to="/"><ArrowRight className="back-arrow" size={16} /> Назад в каталог</Link>
-      {product.category.department && <nav className="catalog-breadcrumbs detail-breadcrumbs" aria-label="Хлебные крошки"><Link to="/">Главная</Link><span>/</span><Link to={`/catalog/${product.category.department.slug}`}>{product.category.department.name}</Link><span>/</span><Link to={`/catalog/${product.category.department.slug}/${product.category.slug}`}>{product.category.name}</Link></nav>}
+      {product.category.department && <nav className="catalog-breadcrumbs detail-breadcrumbs" aria-label="Хлебные крошки"><Link to="/">Главная</Link><span>/</span><Link to={`/catalog/${product.category.department.slug}`}>{product.category.department.name}</Link>{product.category.section && <><span>/</span><Link to={`/catalog/${product.category.department.slug}/${product.category.section.slug}`}>{product.category.section.name}</Link></>}<span>/</span><Link to={product.category.section ? `/catalog/${product.category.department.slug}/${product.category.section.slug}/${product.category.slug}` : `/catalog/${product.category.department.slug}/${product.category.slug}`}>{product.category.name}</Link></nav>}
       <div className="detail-layout">
         <ProductGallery key={product.id} product={product} />
         <div className="detail-content">

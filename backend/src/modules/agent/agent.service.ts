@@ -14,8 +14,8 @@ export class AgentService {
     private readonly config: ConfigService,
   ) {}
 
-  catalog(categoryId?: string, search?: string, department?: string, sort?: string, attributes?: Record<string, string>) {
-    return this.products.listAgent(categoryId, search, department, sort, attributes);
+  catalog(categoryId?: string, search?: string, department?: string, sort?: string, attributes?: Record<string, string>, section?: string) {
+    return this.products.listAgent(categoryId, search, department, sort, attributes, section);
   }
 
   product(id: string) {

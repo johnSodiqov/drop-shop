@@ -10,7 +10,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 
-export const STORAGE_DIRECTORIES = ['products', 'categories', 'departments', 'banners', 'brands'] as const;
+export const STORAGE_DIRECTORIES = ['products', 'categories', 'departments', 'sections', 'banners', 'brands'] as const;
 export type StorageDirectory = (typeof STORAGE_DIRECTORIES)[number];
 
 export interface UploadedMedia {

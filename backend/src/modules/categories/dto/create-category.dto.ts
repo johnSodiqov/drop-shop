@@ -8,6 +8,7 @@ export class CreateCategoryDto {
   name!: string;
 
   @IsOptional() @IsString() departmentId?: string;
+  @IsOptional() @IsString() sectionId?: string | null;
   @IsOptional() @IsString() parentId?: string | null;
   @IsOptional() @IsInt() @Min(0) @Max(100000) sortOrder?: number;
   @IsOptional() @IsBoolean() isActive?: boolean;

@@ -18,18 +18,21 @@ export interface Category {
   imageUrl?: string | null;
   imageKey?: string | null;
   departmentId?: string;
+  sectionId?: string | null;
   parentId?: string | null;
   sortOrder?: number;
   isActive?: boolean;
   parent?: { id: string; name: string; slug: string } | null;
   department?: Department;
+  section?: CatalogSection | null;
   attributes?: CategoryAttribute[];
   _count?: { products: number; children?: number };
 }
 
 export interface Department {
-  id: string; name: string; slug: string; description: string; imageUrl?: string | null; imageKey?: string | null; sortOrder: number; isActive: boolean; categories?: Category[];
+  id: string; name: string; slug: string; description: string; imageUrl?: string | null; imageKey?: string | null; sortOrder: number; isActive: boolean; sections?: CatalogSection[]; categories?: Category[];
 }
+export interface CatalogSection { id: string; departmentId: string; name: string; slug: string; description: string; imageUrl?: string | null; imageKey?: string | null; sortOrder: number; isActive: boolean; categories?: Category[]; _count?: { categories: number } }
 export interface CategoryAttribute { id: string; key: string; label: string; type: string; required: boolean; options?: unknown; sortOrder: number }
 
 export interface Product {
@@ -48,7 +51,7 @@ export interface Product {
   status: string;
   categoryId: string;
   attributes?: Record<string, string | number | boolean> | null;
-  category: { id: string; name: string; slug: string; attributes?: CategoryAttribute[]; department?: { id: string; name: string; slug: string }; parent?: { id: string; name: string; slug: string } | null };
+  category: { id: string; name: string; slug: string; attributes?: CategoryAttribute[]; department?: { id: string; name: string; slug: string }; section?: { id: string; name: string; slug: string } | null; parent?: { id: string; name: string; slug: string } | null };
   inventory: { quantity: number } | null;
 }
 

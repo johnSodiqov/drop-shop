@@ -11,24 +11,26 @@ import { UpdateProductDto } from './dto/update-product.dto';
 
 const productSelection = {
   inventory: { select: { quantity: true } },
-  category: { select: { id: true, name: true, slug: true, department: { select: { id: true, name: true, slug: true } }, parent: { select: { id: true, name: true, slug: true } }, attributes: { orderBy: { sortOrder: 'asc' } } } },
+  category: { select: { id: true, name: true, slug: true, department: { select: { id: true, name: true, slug: true } }, section: { select: { id: true, name: true, slug: true } }, parent: { select: { id: true, name: true, slug: true } }, attributes: { orderBy: { sortOrder: 'asc' } } } },
 } as const;
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listPublic(categoryId?: string, search?: string, departmentSlug?: string, sort?: string, attributes?: Record<string, string>) {
+  async listPublic(categoryId?: string, search?: string, departmentSlug?: string, sort?: string, attributes?: Record<string, string>, sectionSlug?: string) {
     const department = departmentSlug ? await this.prisma.department.findUnique({ where: { slug: departmentSlug }, select: { id: true } }) : null;
     if (departmentSlug && !department) throw new NotFoundException('Department not found');
-    const attributeDefinitions = attributes ? await this.prisma.categoryAttribute.findMany({ where: { key: { in: Object.keys(attributes) }, ...(categoryId ? { categoryId } : department ? { category: { departmentId: department.id } } : {}) }, select: { key: true, type: true } }) : [];
+    const section = sectionSlug ? await this.prisma.catalogSection.findUnique({ where: { slug: sectionSlug }, select: { id: true, departmentId: true } }) : null;
+    if (sectionSlug && (!section || (department && section.departmentId !== department.id))) throw new NotFoundException('Section not found');
+    const attributeDefinitions = attributes ? await this.prisma.categoryAttribute.findMany({ where: { key: { in: Object.keys(attributes) }, ...(categoryId ? { categoryId } : section ? { category: { sectionId: section.id } } : department ? { category: { departmentId: department.id } } : {}) }, select: { key: true, type: true } }) : [];
     const attributeTypes = new Map(attributeDefinitions.map((definition) => [definition.key, definition.type]));
     const products = await this.prisma.product.findMany({
       where: {
         status: ProductStatus.ACTIVE,
         inventory: { is: { quantity: { gt: 0 } } },
         ...(categoryId ? { categoryId } : {}),
-        category: { isActive: true, department: { isActive: true }, ...(department ? { departmentId: department.id } : {}) },
+        category: { isActive: true, department: { isActive: true }, ...(department ? { departmentId: department.id } : {}), ...(section ? { sectionId: section.id } : {}) },
         ...(attributes ? { AND: Object.entries(attributes).map(([key, value]) => ({ attributes: { path: [key], equals: attributeTypes.get(key) === 'number' && value !== '' ? Number(value) : value } })) } : {}),
         ...(search
           ? {
@@ -55,17 +57,19 @@ export class ProductsService {
     return publicProduct;
   }
 
-  async listAgent(categoryId?: string, search?: string, departmentSlug?: string, sort?: string, attributes?: Record<string, string>) {
+  async listAgent(categoryId?: string, search?: string, departmentSlug?: string, sort?: string, attributes?: Record<string, string>, sectionSlug?: string) {
     const department = departmentSlug ? await this.prisma.department.findUnique({ where: { slug: departmentSlug }, select: { id: true } }) : null;
     if (departmentSlug && !department) throw new NotFoundException('Department not found');
-    const definitions = attributes ? await this.prisma.categoryAttribute.findMany({ where: { key: { in: Object.keys(attributes) }, ...(categoryId ? { categoryId } : department ? { category: { departmentId: department.id } } : {}) }, select: { key: true, type: true } }) : [];
+    const section = sectionSlug ? await this.prisma.catalogSection.findUnique({ where: { slug: sectionSlug }, select: { id: true, departmentId: true } }) : null;
+    if (sectionSlug && (!section || (department && section.departmentId !== department.id))) throw new NotFoundException('Section not found');
+    const definitions = attributes ? await this.prisma.categoryAttribute.findMany({ where: { key: { in: Object.keys(attributes) }, ...(categoryId ? { categoryId } : section ? { category: { sectionId: section.id } } : department ? { category: { departmentId: department.id } } : {}) }, select: { key: true, type: true } }) : [];
     const types = new Map(definitions.map((definition) => [definition.key, definition.type]));
     return this.prisma.product.findMany({
       where: {
         status: ProductStatus.ACTIVE,
         inventory: { is: { quantity: { gt: 0 } } },
         ...(categoryId ? { categoryId } : {}),
-        category: { isActive: true, department: { isActive: true }, ...(department ? { departmentId: department.id } : {}) },
+        category: { isActive: true, department: { isActive: true }, ...(department ? { departmentId: department.id } : {}), ...(section ? { sectionId: section.id } : {}) },
         ...(attributes ? { AND: Object.entries(attributes).map(([key, value]) => ({ attributes: { path: [key], equals: types.get(key) === 'number' ? Number(value) : value } })) } : {}),
         ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
       },

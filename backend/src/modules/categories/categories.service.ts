@@ -11,12 +11,29 @@ export class CategoriesService {
   list() {
     return this.prisma.category.findMany({
       orderBy: [{ department: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { name: 'asc' }],
-      include: { department: true, parent: true, attributes: { orderBy: { sortOrder: 'asc' } }, _count: { select: { products: true, children: true } } },
+      include: { department: true, section: true, parent: true, attributes: { orderBy: { sortOrder: 'asc' } }, _count: { select: { products: true, children: true } } },
     });
   }
 
   listDepartments() {
-    return this.prisma.department.findMany({ orderBy: { sortOrder: 'asc' }, include: { categories: { orderBy: { sortOrder: 'asc' }, include: { _count: { select: { products: true } } } } } });
+    return this.prisma.department.findMany({ orderBy: { sortOrder: 'asc' }, include: { sections: { orderBy: { sortOrder: 'asc' }, include: { categories: { orderBy: { sortOrder: 'asc' }, include: { _count: { select: { products: true } } } }, _count: { select: { categories: true } } } }, categories: { where: { sectionId: null }, orderBy: { sortOrder: 'asc' }, include: { _count: { select: { products: true } } } } } });
+  }
+
+  async createSection(input: { departmentId: string; name: string; slug?: string; description?: string; imageUrl?: string; imageKey?: string; sortOrder?: number }) {
+    if (!(await this.prisma.department.findUnique({ where: { id: input.departmentId }, select: { id: true } }))) throw new NotFoundException('Department not found');
+    return this.prisma.catalogSection.create({ data: { ...input, name: input.name.trim(), slug: input.slug ?? this.slug(input.name), sortOrder: input.sortOrder ?? 0 } });
+  }
+
+  async updateSection(id: string, input: { departmentId?: string; name?: string; slug?: string; description?: string; imageUrl?: string; imageKey?: string; sortOrder?: number; isActive?: boolean }) {
+    const current = await this.prisma.catalogSection.findUnique({ where: { id }, select: { id: true, departmentId: true } });
+    if (!current) throw new NotFoundException('Section not found');
+    const departmentId = input.departmentId ?? current.departmentId;
+    if (input.departmentId && !(await this.prisma.department.findUnique({ where: { id: departmentId }, select: { id: true } }))) throw new NotFoundException('Department not found');
+    return this.prisma.$transaction(async (tx) => {
+      const section = await tx.catalogSection.update({ where: { id }, data: { ...input, ...(input.name ? { name: input.name.trim() } : {}) } });
+      if (current.departmentId !== departmentId) await tx.category.updateMany({ where: { sectionId: id }, data: { departmentId } });
+      return section;
+    });
   }
 
   async setAttributes(categoryId: string, attributes: Array<{ key: string; label: string; type: string; required: boolean; sortOrder: number; options?: unknown }>) {
@@ -37,12 +54,15 @@ export class CategoriesService {
       const departmentId = input.departmentId ?? 'dept_home';
       const department = await this.prisma.department.findUnique({ where: { id: departmentId } });
       if (!department) throw new NotFoundException('Department not found');
-      if (input.parentId) await this.assertParent(input.parentId, departmentId);
+      const sectionId = input.sectionId ?? null;
+      if (sectionId) await this.assertSection(sectionId, departmentId);
+      if (input.parentId) await this.assertParent(input.parentId, departmentId, undefined, sectionId);
       return await this.prisma.category.create({
         data: {
           name,
           slug: (await this.prisma.category.findUnique({ where: { slug: slugBase }, select: { id: true } })) ? `${slugBase}-${randomUUID().slice(0, 8)}` : slugBase,
           departmentId,
+          sectionId,
           parentId: input.parentId ?? null,
           sortOrder: input.sortOrder ?? 0,
           isActive: input.isActive ?? true,
@@ -62,13 +82,16 @@ export class CategoriesService {
     const departmentId = input.departmentId ?? category.departmentId;
     if (input.departmentId && !(await this.prisma.department.findUnique({ where: { id: departmentId } }))) throw new NotFoundException('Department not found');
     const parentId = input.parentId === undefined ? category.parentId : input.parentId;
-    if (parentId) await this.assertParent(parentId, departmentId, id);
+    const sectionId = input.sectionId === undefined ? category.sectionId : input.sectionId;
+    if (sectionId) await this.assertSection(sectionId, departmentId);
+    if (parentId) await this.assertParent(parentId, departmentId, id, sectionId);
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.category.update({
         where: { id },
         data: {
           ...(input.name ? { name: input.name.trim() } : {}),
           departmentId,
+          sectionId,
           parentId,
           ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
           ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
@@ -76,7 +99,7 @@ export class CategoriesService {
           ...(input.imageKey !== undefined ? { imageKey: input.imageKey } : {}),
         },
       });
-      if (departmentId !== category.departmentId || input.isActive !== undefined) {
+      if (departmentId !== category.departmentId || sectionId !== category.sectionId || input.isActive !== undefined) {
         let frontier = [id];
         const descendants: string[] = [];
         while (frontier.length) {
@@ -84,7 +107,7 @@ export class CategoriesService {
           frontier = children.map((child) => child.id);
           descendants.push(...frontier);
         }
-        if (descendants.length) await tx.category.updateMany({ where: { id: { in: descendants } }, data: { ...(departmentId !== category.departmentId ? { departmentId } : {}), ...(input.isActive !== undefined ? { isActive: input.isActive } : {}) } });
+        if (descendants.length) await tx.category.updateMany({ where: { id: { in: descendants } }, data: { ...(departmentId !== category.departmentId ? { departmentId } : {}), ...(sectionId !== category.sectionId ? { sectionId } : {}), ...(input.isActive !== undefined ? { isActive: input.isActive } : {}) } });
       }
       return updated;
     });
@@ -102,11 +125,16 @@ export class CategoriesService {
 
   private slug(name: string) { return name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[а-яё]/gi, c => ({ а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'kh',ц:'ts',ч:'ch',ш:'sh',щ:'shch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya' }[c.toLowerCase()] ?? c)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 
-  private async assertParent(parentId: string, departmentId: string, currentId?: string) {
+  private async assertParent(parentId: string, departmentId: string, currentId?: string, sectionId?: string | null) {
     if (parentId === currentId) throw new ConflictException('A category cannot be its own parent');
-    const parent = await this.prisma.category.findUnique({ where: { id: parentId }, select: { id: true, departmentId: true, parentId: true } });
-    if (!parent || parent.departmentId !== departmentId) throw new ConflictException('Parent category must belong to the same department');
-    if (currentId) { let ancestor: typeof parent | null = parent; while (ancestor) { if (ancestor.id === currentId) throw new ConflictException('Category hierarchy cannot contain a cycle'); ancestor = ancestor.parentId ? await this.prisma.category.findUnique({ where: { id: ancestor.parentId }, select: { id: true, departmentId: true, parentId: true } }) : null; } }
+    const parent = await this.prisma.category.findUnique({ where: { id: parentId }, select: { id: true, departmentId: true, parentId: true, sectionId: true } });
+    if (!parent || parent.departmentId !== departmentId || parent.sectionId !== (sectionId ?? null)) throw new ConflictException('Parent category must belong to the same department and section');
+    if (currentId) { let ancestor: typeof parent | null = parent; while (ancestor) { if (ancestor.id === currentId) throw new ConflictException('Category hierarchy cannot contain a cycle'); ancestor = ancestor.parentId ? await this.prisma.category.findUnique({ where: { id: ancestor.parentId }, select: { id: true, departmentId: true, parentId: true, sectionId: true } }) : null; } }
+  }
+
+  private async assertSection(sectionId: string, departmentId: string) {
+    const section = await this.prisma.catalogSection.findUnique({ where: { id: sectionId }, select: { departmentId: true } });
+    if (!section || section.departmentId !== departmentId) throw new ConflictException('Section must belong to the selected department');
   }
 
   async remove(id: string): Promise<{ success: true }> {

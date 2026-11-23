@@ -83,6 +83,7 @@ model Category {
   name      String
   slug      String    @unique
   departmentId String
+  sectionId String?
   parentId  String?
   sortOrder Int       @default(0)
   isActive  Boolean   @default(true)
@@ -92,11 +93,12 @@ model Category {
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)
   products  Product[]
   department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  section CatalogSection? @relation(fields: [sectionId], references: [id], onDelete: Restrict)
   parent    Category? @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children  Category[] @relation("CategoryTree")
   attributes CategoryAttribute[]
 
-  @@index([departmentId, parentId, sortOrder])
+  @@index([departmentId, sectionId, parentId, sortOrder])
   @@unique([departmentId, name])
 }
 
@@ -112,6 +114,25 @@ model Department {
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
   categories  Category[]
+  sections CatalogSection[]
+}
+
+model CatalogSection {
+  id          String @id @default(cuid())
+  departmentId String
+  name        String
+  slug        String @unique
+  description String @default("")
+  imageUrl    String?
+  imageKey    String?
+  sortOrder   Int @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  categories Category[]
+  @@unique([departmentId, name])
+  @@index([departmentId, sortOrder])
 }
 
 model CategoryAttribute {
