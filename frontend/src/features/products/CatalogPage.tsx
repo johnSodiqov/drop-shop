@@ -78,6 +78,7 @@ export function CatalogPage() {
   });
   const categoryCount = useMemo(() => categories.data?.reduce((sum, category) => sum + (category._count?.products ?? 0), 0) ?? 0, [categories.data]);
   const selectedCategory = categories.data?.find((category) => category.id === categoryId);
+  const visibleCategories = categories.data?.filter((category) => category.isActive !== false && !category.parentId && (!departmentSlug || category.department?.slug === departmentSlug)).slice(0, departmentSlug ? 30 : 8) ?? [];
   return (
     <PageContainer>
       <section className="hero">
@@ -106,13 +107,13 @@ export function CatalogPage() {
           ))}
         </section>
       )}
-      {!agentMode && !departmentSlug && categories.data && categories.data.length > 0 && (
+      {!agentMode && visibleCategories.length > 0 && (
         <section className="home-categories" aria-labelledby="categories-title">
           <div className="section-heading">
-            <div><span className="eyebrow">DROPSTORE</span><h2 id="categories-title">Популярные категории</h2><p>Подборки товаров по всем торговым направлениям.</p></div>
+            <div><span className="eyebrow">{department?.name ?? 'DROPSTORE'}</span><h2 id="categories-title">{department ? `Категории: ${department.name}` : 'Популярные категории'}</h2><p>{department ? 'Выберите категорию, чтобы перейти к подходящим товарам.' : 'Подборки товаров по всем торговым направлениям.'}</p></div>
           </div>
           <div className="category-grid">
-            {categories.data.filter((category) => category.isActive && !category.parentId).slice(0, 8).map((category) => (
+            {visibleCategories.map((category) => (
               <Link className="category-card" key={category.id} to={`/catalog/${category.department?.slug ?? 'home'}/${category.slug}`}>
                 {category.imageUrl ? <img src={category.imageUrl} alt="" loading="lazy" /> : <span className="category-card-art"><ShoppingBag size={34} /></span>}
                 <span className="category-card-copy"><strong>{category.name}</strong><span>{category._count?.products ?? 0} товаров <ArrowRight size={16} /></span></span>
@@ -130,7 +131,7 @@ export function CatalogPage() {
         {categories.isError && <ErrorState message={errorMessage(categories.error)} />}
         <div className="category-filters">
           <button className={!categoryId ? 'category-filter active' : 'category-filter'} onClick={() => { setAttributeFilters({}); navigate(departmentSlug ? `/catalog/${departmentSlug}` : '/'); }}>Все товары</button>
-          {categories.data?.filter((category) => category.isActive && (!departmentSlug || category.department?.slug === departmentSlug)).map((category) => <button key={category.id} className={categoryId === category.id ? 'category-filter active' : 'category-filter'} onClick={() => { setAttributeFilters({}); navigate(`/catalog/${category.department?.slug ?? departmentSlug ?? 'home'}/${category.slug}`); }}>{category.name}</button>)}
+          {categories.data?.filter((category) => category.isActive !== false && (!departmentSlug || category.department?.slug === departmentSlug)).map((category) => <button key={category.id} className={categoryId === category.id ? 'category-filter active' : 'category-filter'} onClick={() => { setAttributeFilters({}); navigate(`/catalog/${category.department?.slug ?? departmentSlug ?? 'home'}/${category.slug}`); }}>{category.name}</button>)}
         </div>
         <div className="catalog-controls">
           <label className="field"><span>Сортировка</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option value="newest">Сначала новые</option><option value="price-asc">Сначала дешевле</option><option value="price-desc">Сначала дороже</option><option value="name">По названию</option></select></label>

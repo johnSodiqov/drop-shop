@@ -421,3 +421,23 @@ td { border-top-color: var(--color-border); color: #5d554c; font-size: 12px; }
 .catalog-breadcrumbs span:last-child { color:#353027; }
 .detail-breadcrumbs { margin-top:16px; }
 @media(max-width:850px) { .department-grid { grid-template-columns:1fr; } .department-card { min-height:250px; } }
+
+/* Catalog management layout: keep uploaders and fields in the content grid. */
+.inline-form.catalog-admin-form { display:grid; width:100%; max-width:none; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; gap:16px; }
+.catalog-admin-form > .field { min-width:0; }
+.catalog-admin-form > .media-uploader { min-width:0; }
+.category-row > div:first-child { min-width:0; flex:1; flex-direction:row; align-items:center; gap:12px; }
+.category-row > div:first-child > span { overflow-wrap:anywhere; }
+.category-row .category-actions { flex:0 0 auto; flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:flex-end; }
+.category-row .category-actions .button-icon { flex:0 0 36px; }
+.department-admin-list { margin:0 0 24px; }
+.category-create-form { margin-top:24px; }
+.department-create-form .media-uploader { min-height:0; }
+.catalog-category-section { margin-top:28px; }
+.catalog-admin-form .button { min-height:44px; }
+@media(max-width:700px) {
+  .inline-form.catalog-admin-form { grid-template-columns:minmax(0,1fr); gap:12px; }
+  .category-row { align-items:flex-start; gap:12px; padding:12px; }
+  .category-row > div:first-child { align-items:flex-start; }
+  .category-row .category-actions { max-width:150px; }
+}
