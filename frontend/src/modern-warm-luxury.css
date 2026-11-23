@@ -435,9 +435,11 @@ td { border-top-color: var(--color-border); color: #5d554c; font-size: 12px; }
 .department-create-form .media-uploader { min-height:0; }
 .catalog-category-section { margin-top:28px; }
 .catalog-admin-form .button { min-height:44px; }
+.catalog-admin-form .admin-submit-button { grid-column:1 / -1; justify-self:end; min-width:220px; }
 .catalog-admin-subheading { margin:24px 0 12px; color:var(--color-text); font-size:18px; }
 @media(max-width:700px) {
   .inline-form.catalog-admin-form { grid-template-columns:minmax(0,1fr); gap:12px; }
+  .catalog-admin-form .admin-submit-button { width:100%; min-width:0; grid-column:1; }
   .category-row { align-items:flex-start; gap:12px; padding:12px; }
   .category-row > div:first-child { align-items:flex-start; }
   .category-row .category-actions { max-width:150px; }
