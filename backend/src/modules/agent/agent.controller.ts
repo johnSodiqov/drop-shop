@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedUser, CurrentUser } from '../../common/auth/current-user.decorator';
@@ -25,8 +25,17 @@ export class AgentController {
   }
 
   @Get('catalog')
-  catalog(@Query('categoryId') categoryId?: string, @Query('search') search?: string) {
-    return this.agent.catalog(categoryId, search?.slice(0, 100));
+  catalog(@Query('categoryId') categoryId?: string, @Query('search') search?: string, @Query('department') department?: string, @Query('sort') sort?: string, @Query('attributes') attributesJson?: string) {
+    let attributes: Record<string, string> | undefined;
+    if (attributesJson) {
+      try {
+        if (attributesJson.length > 1000) throw new Error('too long');
+        const parsed: unknown = JSON.parse(attributesJson);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.values(parsed).length > 10 || Object.values(parsed).some((value) => typeof value !== 'string')) throw new Error('invalid');
+        attributes = parsed as Record<string, string>;
+      } catch { throw new BadRequestException('Invalid attribute filters'); }
+    }
+    return this.agent.catalog(categoryId, search?.slice(0, 100), department, sort, attributes);
   }
 
   @Get('catalog/:id')

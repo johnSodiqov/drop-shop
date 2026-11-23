@@ -17,8 +17,20 @@ export interface Category {
   slug: string;
   imageUrl?: string | null;
   imageKey?: string | null;
-  _count?: { products: number };
+  departmentId?: string;
+  parentId?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+  parent?: { id: string; name: string; slug: string } | null;
+  department?: Department;
+  attributes?: CategoryAttribute[];
+  _count?: { products: number; children?: number };
 }
+
+export interface Department {
+  id: string; name: string; slug: string; description: string; imageUrl?: string | null; imageKey?: string | null; sortOrder: number; isActive: boolean; categories?: Category[];
+}
+export interface CategoryAttribute { id: string; key: string; label: string; type: string; required: boolean; options?: unknown; sortOrder: number }
 
 export interface Product {
   id: string;
@@ -35,7 +47,8 @@ export interface Product {
   allowAgentPriceChange?: boolean;
   status: string;
   categoryId: string;
-  category: { id: string; name: string; slug: string };
+  attributes?: Record<string, string | number | boolean> | null;
+  category: { id: string; name: string; slug: string; attributes?: CategoryAttribute[]; department?: { id: string; name: string; slug: string }; parent?: { id: string; name: string; slug: string } | null };
   inventory: { quantity: number } | null;
 }
 

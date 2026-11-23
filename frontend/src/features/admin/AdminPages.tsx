@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { ErrorState, EmptyState, LoadingState } from '../../components/StateView';
 import { PageContainer } from '../../components/Layout';
 import { api, errorMessage, formatMoney } from '../../lib/api';
-import { Category, Product, User } from '../../types';
+import { Category, Department, Product, User } from '../../types';
 
 interface DashboardData {
   productsCount: number;
@@ -137,7 +137,7 @@ function MediaUploader({
   onChange,
   multiple = true,
 }: {
-  directory: 'products' | 'categories' | 'banners' | 'brands';
+  directory: 'products' | 'categories' | 'departments' | 'banners' | 'brands';
   value: MediaItem[];
   onChange: (items: MediaItem[]) => void;
   multiple?: boolean;
@@ -222,10 +222,12 @@ function MediaUploader({
 
 function ProductForm({
   categories,
+  departments,
   product,
   close,
 }: {
   categories: Category[];
+  departments: Department[];
   product?: Product;
   close: () => void;
 }) {
@@ -243,6 +245,8 @@ function ProductForm({
       })).filter((item) => item.url);
     })(),
   );
+  const [attributes, setAttributes] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(product?.attributes ?? {}).map(([key, value]) => [key, String(value)])));
+  const [departmentId, setDepartmentId] = useState(product?.category.department?.id ?? categories.find((category) => category.id === product?.categoryId)?.departmentId ?? departments[0]?.id ?? '');
   const form = useForm<ProductFormInput, unknown, ProductValues>({
     resolver: zodResolver(productSchema),
     defaultValues: product
@@ -265,6 +269,10 @@ function ProductForm({
     mutationFn: async (values: ProductValues) => {
       const payload = {
         ...values,
+        attributes: Object.fromEntries(Object.entries(attributes).filter(([, value]) => value !== '').map(([key, value]) => {
+          const definition = categories.find((category) => category.id === values.categoryId)?.attributes?.find((item) => item.key === key);
+          return [key, definition?.type === 'number' ? Number(value) : definition?.type === 'boolean' ? value === 'true' : value];
+        })),
         imageUrl: media[0]?.url || undefined,
         imageUrls: media.map((item) => item.url),
         imageKeys: media.map((item) => item.key).filter(Boolean),
@@ -287,7 +295,9 @@ function ProductForm({
           <label className="field"><span>Артикул SKU</span><input {...form.register('sku')} />{form.formState.errors.sku && <small className="field-error">{form.formState.errors.sku.message}</small>}</label>
           <label className="field"><span>Название</span><input {...form.register('name')} /></label>
           <label className="field field-span"><span>Описание</span><textarea rows={3} {...form.register('description')} /></label>
-          <label className="field"><span>Категория</span><select {...form.register('categoryId')}><option value="">Выберите</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
+          <label className="field"><span>Торговое направление</span><select value={departmentId} onChange={(event) => { setDepartmentId(event.target.value); form.setValue('categoryId', ''); setAttributes({}); }}><option value="">Выберите</option>{departments.map((department) => <option value={department.id} key={department.id}>{department.name}</option>)}</select></label>
+          <label className="field"><span>Категория / подкатегория</span><select {...form.register('categoryId')}><option value="">Выберите</option>{categories.filter((category) => category.departmentId === departmentId && category.isActive).map((category) => <option value={category.id} key={category.id}>{category.parent ? `↳ ${category.name}` : category.name}</option>)}</select></label>
+          {categories.find((category) => category.id === form.watch('categoryId'))?.attributes?.map((definition) => <label className="field" key={definition.key}><span>{definition.label}{definition.required ? ' *' : ''}</span>{definition.type === 'select' ? <select required={definition.required} value={attributes[definition.key] ?? ''} onChange={(event) => setAttributes((current) => ({ ...current, [definition.key]: event.target.value }))}><option value="">Выберите</option>{(definition.options as string[] | null)?.map((option) => <option key={option}>{option}</option>)}</select> : definition.type === 'boolean' ? <select value={attributes[definition.key] ?? ''} onChange={(event) => setAttributes((current) => ({ ...current, [definition.key]: event.target.value }))}><option value="">—</option><option value="true">Да</option><option value="false">Нет</option></select> : <input type={definition.type === 'date' ? 'date' : definition.type === 'number' ? 'number' : 'text'} required={definition.required} value={attributes[definition.key] ?? ''} onChange={(event) => setAttributes((current) => ({ ...current, [definition.key]: event.target.value }))} />}</label>)}
           <MediaUploader directory="products" value={media} onChange={setMedia} />
           <label className="field"><span>Закупочная цена</span><input inputMode="decimal" {...form.register('costPrice')} /></label>
           <label className="field"><span>Минимальная цена</span><input inputMode="decimal" {...form.register('minimumPrice')} /></label>
@@ -309,6 +319,7 @@ export function AdminProductsPage() {
   const queryClient = useQueryClient();
   const products = useQuery({ queryKey: ['admin-products'], queryFn: async () => (await api.get<Product[]>('/admin/products')).data });
   const categories = useQuery({ queryKey: ['categories'], queryFn: async () => (await api.get<Category[]>('/categories')).data });
+  const departments = useQuery({ queryKey: ['departments'], queryFn: async () => (await api.get<Department[]>('/categories/departments')).data });
   const [editing, setEditing] = useState<Product | null | undefined>();
   const [error, setError] = useState('');
   const remove = useMutation({
@@ -325,32 +336,37 @@ export function AdminProductsPage() {
             {products.data.map((product) => <tr key={product.id}><td><div className="table-product"><b>{product.name}</b><small>{product.sku}</small></div></td><td>{product.category.name}</td><td>{formatMoney(product.costPrice ?? '0')}</td><td>{formatMoney(product.recommendedPrice)}</td><td>{product.inventory?.quantity ?? 0}</td><td><span className={`status-badge status-${product.status.toLowerCase()}`}>{product.status === 'ACTIVE' ? 'Активен' : product.status === 'HIDDEN' ? 'Скрыт' : product.status === 'ARCHIVED' ? 'Архив' : 'Нет в наличии'}</span></td><td className="table-actions"><button className="button-icon" aria-label={`Изменить ${product.name}`} onClick={() => setEditing(product)}><Pencil size={16} /></button><button className="button-icon danger-icon" aria-label={`Архивировать ${product.name}`} onClick={() => { if (window.confirm(`Архивировать «${product.name}»?`)) remove.mutate(product.id); }}><Trash2 size={16} /></button></td></tr>)}
           </tbody></table></div>}
       {error && <p className="form-error">{error}</p>}
-      {editing !== undefined && categories.data && <ProductForm categories={categories.data} product={editing ?? undefined} close={() => setEditing(undefined)} />}
+      {editing !== undefined && categories.data && departments.data && <ProductForm categories={categories.data} departments={departments.data} product={editing ?? undefined} close={() => setEditing(undefined)} />}
     </PageContainer>
   );
 }
 
-const categorySchema = z.object({ name: z.string().trim().min(2).max(80) });
+const categorySchema = z.object({ name: z.string().trim().min(2).max(80), departmentId: z.string().min(1), parentId: z.string().optional(), sortOrder: z.coerce.number().int().min(0) });
 export function AdminCategoriesPage() {
   const queryClient = useQueryClient();
   const categories = useQuery({ queryKey: ['categories'], queryFn: async () => (await api.get<Category[]>('/categories')).data });
-  const form = useForm<{ name: string }>({ resolver: zodResolver(categorySchema) });
+  const departments = useQuery({ queryKey: ['departments'], queryFn: async () => (await api.get<Department[]>('/categories/departments')).data });
+  const form = useForm<z.input<typeof categorySchema>, unknown, z.output<typeof categorySchema>>({ resolver: zodResolver(categorySchema), defaultValues: { departmentId: 'dept_home', sortOrder: 0 } });
+  const [newDepartment, setNewDepartment] = useState('');
+  const [newDepartmentDescription, setNewDepartmentDescription] = useState('');
+  const [departmentMedia, setDepartmentMedia] = useState<MediaItem[]>([]);
   const [categoryMedia, setCategoryMedia] = useState<MediaItem[]>([]);
   const [categoryError, setCategoryError] = useState('');
   const add = useMutation({
-    mutationFn: (values: { name: string }) => api.post('/categories', {
+    mutationFn: (values: { name: string; departmentId: string; parentId?: string; sortOrder: number }) => api.post('/categories', {
       ...values,
+      parentId: values.parentId || null,
       imageUrl: categoryMedia[0]?.url,
       imageKey: categoryMedia[0]?.key,
     }),
-    onSuccess: async () => { form.reset(); setCategoryMedia([]); await queryClient.invalidateQueries({ queryKey: ['categories'] }); },
+    onSuccess: async () => { form.reset({ departmentId: departments.data?.[0]?.id ?? 'dept_home', sortOrder: 0 }); setCategoryMedia([]); await queryClient.invalidateQueries({ queryKey: ['categories'] }); },
   });
   const remove = useMutation({
     mutationFn: (id: string) => api.delete(`/categories/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['categories'] }); await queryClient.invalidateQueries({ queryKey: ['departments'] }); },
   });
   const rename = useMutation({
-    mutationFn: ({ id, name, imageUrl, imageKey }: { id: string; name: string; imageUrl?: string | null; imageKey?: string | null }) => api.patch(`/categories/${id}`, { name, imageUrl: imageUrl || undefined, imageKey: imageKey || undefined }),
+    mutationFn: ({ id, ...values }: { id: string; name?: string; imageUrl?: string | null; imageKey?: string | null; isActive?: boolean; sortOrder?: number; departmentId?: string; parentId?: string | null }) => api.patch(`/categories/${id}`, values),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
   });
   async function uploadCategoryImage(category: Category, files: FileList | null) {
@@ -374,12 +390,56 @@ export function AdminCategoriesPage() {
       setCategoryError(errorMessage(reason));
     }
   }
-  return <PageContainer><div className="page-heading"><span className="eyebrow">КАТАЛОГ</span><h1>Категории</h1><p>Категории помогают покупателям находить нужные товары.</p></div>
-    <form className="inline-form" onSubmit={form.handleSubmit((values) => add.mutate(values))}><label className="field"><span>Название категории</span><input placeholder="Например, Для дома" {...form.register('name')} /></label><MediaUploader directory="categories" value={categoryMedia} onChange={setCategoryMedia} multiple={false} /><button className="button button-primary" disabled={add.isPending}>{add.isPending ? 'Добавляем…' : 'Добавить категорию'}</button></form>
+  async function configureAttributes(category: Category) {
+    const current = (category.attributes ?? []).map(({ key, label, type, required, sortOrder, options }) => ({ key, label, type, required, sortOrder, ...(options ? { options } : {}) }));
+    const raw = window.prompt('Характеристики категории в формате JSON-массива', JSON.stringify(current, null, 2));
+    if (!raw) return;
+    try {
+      const attributes = JSON.parse(raw) as unknown[];
+      if (!Array.isArray(attributes)) throw new Error('Нужен JSON-массив');
+      await api.patch(`/categories/${category.id}/attributes`, { attributes });
+      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+    } catch (reason) { setCategoryError(reason instanceof Error ? reason.message : errorMessage(reason)); }
+  }
+  async function editDepartment(department: Department) {
+    const name = window.prompt('Название направления', department.name)?.trim();
+    if (!name) return;
+    const description = window.prompt('Краткое описание', department.description)?.trim() ?? department.description;
+    const sortOrder = window.prompt('Порядок отображения', String(department.sortOrder));
+    if (sortOrder === null || !Number.isInteger(Number(sortOrder)) || Number(sortOrder) < 0) return;
+    try {
+      await api.patch(`/categories/departments/${department.id}`, { name, description, sortOrder: Number(sortOrder) });
+      await queryClient.invalidateQueries({ queryKey: ['departments'] });
+    } catch (reason) { setCategoryError(errorMessage(reason)); }
+  }
+  async function uploadDepartmentCover(department: Department, files: FileList | null) {
+    if (!files?.[0]) return;
+    const formData = new FormData(); formData.append('file', files[0]);
+    try {
+      const response = await api.post<{ data: MediaItem }>('/storage/upload?directory=departments', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.patch(`/categories/departments/${department.id}`, { imageUrl: response.data.data.url, imageKey: response.data.data.key });
+      await queryClient.invalidateQueries({ queryKey: ['departments'] });
+    } catch (reason) { setCategoryError(errorMessage(reason)); }
+  }
+  function organizeCategory(category: Category) {
+    const departmentId = window.prompt('ID направления для перемещения', category.departmentId);
+    if (departmentId === null) return;
+    const parentId = window.prompt('ID родительской категории (пусто — верхний уровень)', category.parentId ?? '');
+    if (parentId === null) return;
+    const sortValue = window.prompt('Порядок отображения', String(category.sortOrder ?? 0));
+    if (sortValue === null || !Number.isInteger(Number(sortValue)) || Number(sortValue) < 0) return;
+    rename.mutate({ id: category.id, departmentId, parentId: parentId || null, sortOrder: Number(sortValue) });
+  }
+  const createDepartment = useMutation({ mutationFn: () => api.post('/categories/departments', { name: newDepartment, description: newDepartmentDescription, imageUrl: departmentMedia[0]?.url, imageKey: departmentMedia[0]?.key, sortOrder: departments.data?.length ?? 0 }), onSuccess: async () => { setNewDepartment(''); setNewDepartmentDescription(''); setDepartmentMedia([]); await queryClient.invalidateQueries({ queryKey: ['departments'] }); } });
+  return <PageContainer><div className="page-heading"><span className="eyebrow">КАТАЛОГ</span><h1>Торговые направления и категории</h1><p>Управляйте направлениями, вложенностью и порядком разделов каталога.</p></div>
+    <form className="inline-form" onSubmit={(event) => { event.preventDefault(); if (newDepartment.trim()) createDepartment.mutate(); }}><label className="field"><span>Новое направление</span><input value={newDepartment} onChange={(event) => setNewDepartment(event.target.value)} placeholder="Например, Косметика" /></label><label className="field"><span>Краткое описание</span><input value={newDepartmentDescription} onChange={(event) => setNewDepartmentDescription(event.target.value)} maxLength={500} /></label><MediaUploader directory="departments" value={departmentMedia} onChange={setDepartmentMedia} multiple={false} /><button className="button button-secondary" disabled={createDepartment.isPending}>Создать направление</button></form>
+    {createDepartment.isError && <p className="form-error">{errorMessage(createDepartment.error)}</p>}
+    {departments.data?.map((department) => <div className="category-row" key={department.id}><div>{department.imageUrl && <img className="category-image" src={department.imageUrl} alt="" loading="lazy" />}<b>{department.name}</b><span>{department.categories?.length ?? 0} категорий · {department.description} · {department.isActive ? 'Активно' : 'Скрыто'}</span></div><div className="category-actions"><label className="button-icon" title="Загрузить обложку"><span>+</span><input className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadDepartmentCover(department, event.target.files)} /></label><button className="button-icon" title="Переключить видимость" onClick={() => { void api.patch(`/categories/departments/${department.id}`, { isActive: !department.isActive }).then(() => queryClient.invalidateQueries({ queryKey: ['departments'] })).catch((reason) => setCategoryError(errorMessage(reason))); }}>{department.isActive ? '●' : '○'}</button><button className="button-icon" title="Изменить направление" onClick={() => void editDepartment(department)}><Pencil size={16} /></button></div></div>)}
+    <form className="inline-form" onSubmit={form.handleSubmit((values) => add.mutate(values))}><label className="field"><span>Название категории</span><input placeholder="Например, Для дома" {...form.register('name')} /></label><label className="field"><span>Направление</span><select {...form.register('departmentId')}>{departments.data?.map((department) => <option value={department.id} key={department.id}>{department.name}</option>)}</select></label><label className="field"><span>Родительская категория</span><select {...form.register('parentId')}><option value="">Верхний уровень</option>{categories.data?.filter((category) => category.departmentId === form.watch('departmentId')).map((category) => <option value={category.id} key={category.id}>{category.parent ? `— ${category.name}` : category.name}</option>)}</select></label><label className="field"><span>Порядок</span><input type="number" min="0" {...form.register('sortOrder')} /></label><MediaUploader directory="categories" value={categoryMedia} onChange={setCategoryMedia} multiple={false} /><button className="button button-primary" disabled={add.isPending}>{add.isPending ? 'Добавляем…' : 'Добавить категорию'}</button></form>
     {categoryError && <p className="form-error">{categoryError}</p>}
     {add.isError && <p className="form-error">{errorMessage(add.error)}</p>}{remove.isError && <p className="form-error">{errorMessage(remove.error)}</p>}
     {categories.isPending ? <LoadingState /> : categories.isError ? <ErrorState message={errorMessage(categories.error)} /> : !categories.data?.length ? <EmptyState label="Категории ещё не созданы." />
-      : <div className="category-list">{categories.data.map((category) => <div className="category-row" key={category.id}><div>{category.imageUrl && <img className="category-image" src={category.imageUrl} alt="" loading="lazy" />}<b>{category.name}</b><span>{category._count?.products ?? 0} товаров</span></div><div className="category-actions"><label className="button-icon" title="Загрузить изображение"><span>+</span><input className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadCategoryImage(category, event.target.files)} /></label><button className="button-icon" title="Переименовать категорию" onClick={() => { const name = window.prompt('Новое название категории', category.name)?.trim(); if (name && name !== category.name) rename.mutate({ id: category.id, name, imageUrl: category.imageUrl, imageKey: category.imageKey }); }}><Pencil size={16} /></button><button className="button-icon danger-icon" title="Удалить категорию" onClick={() => { if (window.confirm(`Удалить категорию «${category.name}»?`)) remove.mutate(category.id); }}><Trash2 size={17} /></button></div></div>)}</div>}
+      : <div className="category-list">{categories.data.map((category) => <div className="category-row" key={category.id}><div>{category.imageUrl && <img className="category-image" src={category.imageUrl} alt="" loading="lazy" />}<b>{category.parent ? `↳ ${category.name}` : category.name}</b><span>{category.department?.name} · {category._count?.products ?? 0} товаров · {category.isActive ? 'Активна' : 'Скрыта'}</span></div><div className="category-actions"><label className="button-icon" title="Загрузить изображение"><span>+</span><input className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadCategoryImage(category, event.target.files)} /></label><button className="button-icon" title="Настроить характеристики" onClick={() => void configureAttributes(category)}>⚙</button><button className="button-icon" title="Переместить или изменить порядок" onClick={() => organizeCategory(category)}>↕</button><button className="button-icon" title="Переключить видимость" onClick={() => rename.mutate({ id: category.id, isActive: !category.isActive })}>{category.isActive ? '●' : '○'}</button><button className="button-icon" title="Переименовать категорию" onClick={() => { const name = window.prompt('Новое название категории', category.name)?.trim(); if (name && name !== category.name) rename.mutate({ id: category.id, name, imageUrl: category.imageUrl, imageKey: category.imageKey }); }}><Pencil size={16} /></button><button className="button-icon danger-icon" title="Удалить категорию" onClick={() => { if (window.confirm(`Удалить категорию «${category.name}»?`)) remove.mutate(category.id); }}><Trash2 size={17} /></button></div></div>)}</div>}
     {rename.isError && <p className="form-error">{errorMessage(rename.error)}</p>}
   </PageContainer>;
 }

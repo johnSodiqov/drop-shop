@@ -10,6 +10,7 @@ import {
   Min,
   MinLength,
   IsUrl,
+  IsObject,
 } from 'class-validator';
 
 const MONEY_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
@@ -30,6 +31,10 @@ export class CreateProductDto {
 
   @IsString()
   categoryId!: string;
+
+  @IsOptional()
+  @IsObject()
+  attributes?: Record<string, unknown>;
 
   @IsString()
   @Matches(MONEY_PATTERN)

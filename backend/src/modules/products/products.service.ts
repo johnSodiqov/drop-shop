@@ -11,19 +11,25 @@ import { UpdateProductDto } from './dto/update-product.dto';
 
 const productSelection = {
   inventory: { select: { quantity: true } },
-  category: { select: { id: true, name: true, slug: true } },
+  category: { select: { id: true, name: true, slug: true, department: { select: { id: true, name: true, slug: true } }, parent: { select: { id: true, name: true, slug: true } }, attributes: { orderBy: { sortOrder: 'asc' } } } },
 } as const;
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listPublic(categoryId?: string, search?: string) {
+  async listPublic(categoryId?: string, search?: string, departmentSlug?: string, sort?: string, attributes?: Record<string, string>) {
+    const department = departmentSlug ? await this.prisma.department.findUnique({ where: { slug: departmentSlug }, select: { id: true } }) : null;
+    if (departmentSlug && !department) throw new NotFoundException('Department not found');
+    const attributeDefinitions = attributes ? await this.prisma.categoryAttribute.findMany({ where: { key: { in: Object.keys(attributes) }, ...(categoryId ? { categoryId } : department ? { category: { departmentId: department.id } } : {}) }, select: { key: true, type: true } }) : [];
+    const attributeTypes = new Map(attributeDefinitions.map((definition) => [definition.key, definition.type]));
     const products = await this.prisma.product.findMany({
       where: {
         status: ProductStatus.ACTIVE,
         inventory: { is: { quantity: { gt: 0 } } },
         ...(categoryId ? { categoryId } : {}),
+        category: { isActive: true, department: { isActive: true }, ...(department ? { departmentId: department.id } : {}) },
+        ...(attributes ? { AND: Object.entries(attributes).map(([key, value]) => ({ attributes: { path: [key], equals: attributeTypes.get(key) === 'number' && value !== '' ? Number(value) : value } })) } : {}),
         ...(search
           ? {
               OR: [
@@ -34,14 +40,14 @@ export class ProductsService {
           : {}),
       },
       include: productSelection,
-      orderBy: { createdAt: 'desc' },
+      orderBy: sort === 'price-asc' ? { recommendedPrice: 'asc' } : sort === 'price-desc' ? { recommendedPrice: 'desc' } : sort === 'name' ? { name: 'asc' } : { createdAt: 'desc' },
     });
     return products.map(({ costPrice: _cost, minimumPrice: _minimum, maximumMarkup: _markup, allowAgentPriceChange: _editable, ...product }) => product);
   }
 
   async getPublic(id: string) {
     const product = await this.prisma.product.findFirst({
-      where: { id, status: ProductStatus.ACTIVE },
+      where: { id, status: ProductStatus.ACTIVE, category: { isActive: true, department: { isActive: true } } },
       include: productSelection,
     });
     if (!product) throw new NotFoundException('Product not found');
@@ -49,22 +55,28 @@ export class ProductsService {
     return publicProduct;
   }
 
-  async listAgent(categoryId?: string, search?: string) {
+  async listAgent(categoryId?: string, search?: string, departmentSlug?: string, sort?: string, attributes?: Record<string, string>) {
+    const department = departmentSlug ? await this.prisma.department.findUnique({ where: { slug: departmentSlug }, select: { id: true } }) : null;
+    if (departmentSlug && !department) throw new NotFoundException('Department not found');
+    const definitions = attributes ? await this.prisma.categoryAttribute.findMany({ where: { key: { in: Object.keys(attributes) }, ...(categoryId ? { categoryId } : department ? { category: { departmentId: department.id } } : {}) }, select: { key: true, type: true } }) : [];
+    const types = new Map(definitions.map((definition) => [definition.key, definition.type]));
     return this.prisma.product.findMany({
       where: {
         status: ProductStatus.ACTIVE,
         inventory: { is: { quantity: { gt: 0 } } },
         ...(categoryId ? { categoryId } : {}),
+        category: { isActive: true, department: { isActive: true }, ...(department ? { departmentId: department.id } : {}) },
+        ...(attributes ? { AND: Object.entries(attributes).map(([key, value]) => ({ attributes: { path: [key], equals: types.get(key) === 'number' ? Number(value) : value } })) } : {}),
         ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
       },
       include: productSelection,
-      orderBy: { createdAt: 'desc' },
+      orderBy: sort === 'price-asc' ? { recommendedPrice: 'asc' } : sort === 'price-desc' ? { recommendedPrice: 'desc' } : sort === 'name' ? { name: 'asc' } : { createdAt: 'desc' },
     });
   }
 
   async getAgent(id: string) {
     const product = await this.prisma.product.findFirst({
-      where: { id, status: ProductStatus.ACTIVE, inventory: { is: { quantity: { gt: 0 } } } },
+      where: { id, status: ProductStatus.ACTIVE, inventory: { is: { quantity: { gt: 0 } } }, category: { isActive: true, department: { isActive: true } } },
       include: productSelection,
     });
     if (!product) throw new NotFoundException('Product not found');
@@ -81,9 +93,7 @@ export class ProductsService {
 
   async create(input: CreateProductDto, actorId: string) {
     this.validatePricing(input.costPrice, input.minimumPrice, input.recommendedPrice, input.maximumMarkup);
-    if (!(await this.prisma.category.findUnique({ where: { id: input.categoryId }, select: { id: true } }))) {
-      throw new NotFoundException('Category not found');
-    }
+    await this.validateAttributes(input.categoryId, input.attributes);
     try {
       return await this.prisma.$transaction(async (tx) => {
         const product = await tx.product.create({
@@ -92,6 +102,7 @@ export class ProductsService {
             name: input.name.trim(),
             description: input.description.trim(),
             categoryId: input.categoryId,
+            attributes: input.attributes as Prisma.InputJsonValue | undefined,
             costPrice: new Prisma.Decimal(input.costPrice),
             recommendedPrice: new Prisma.Decimal(input.recommendedPrice),
             minimumPrice: new Prisma.Decimal(input.minimumPrice),
@@ -137,8 +148,11 @@ export class ProductsService {
     const recommended = input.recommendedPrice ?? current.recommendedPrice.toString();
     const markup = input.maximumMarkup ?? current.maximumMarkup.toString();
     this.validatePricing(cost, minimum, recommended, markup);
-    if (input.categoryId && !(await this.prisma.category.findUnique({ where: { id: input.categoryId }, select: { id: true } }))) {
-      throw new NotFoundException('Category not found');
+    if (input.categoryId !== undefined || input.attributes !== undefined) {
+      const currentAttributes = current.attributes && typeof current.attributes === 'object' && !Array.isArray(current.attributes)
+        ? current.attributes as Record<string, unknown>
+        : undefined;
+      await this.validateAttributes(input.categoryId ?? current.categoryId, input.attributes ?? currentAttributes);
     }
     const resultingStock = input.stock ?? current.inventory?.quantity ?? 0;
     if (input.status === ProductStatus.ACTIVE && resultingStock === 0) {
@@ -153,6 +167,7 @@ export class ProductsService {
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
       ...(input.description !== undefined ? { description: input.description.trim() } : {}),
       ...(input.categoryId !== undefined ? { category: { connect: { id: input.categoryId } } } : {}),
+      ...(input.attributes !== undefined ? { attributes: input.attributes as Prisma.InputJsonValue } : {}),
       ...(input.costPrice !== undefined ? { costPrice: new Prisma.Decimal(cost) } : {}),
       ...(input.recommendedPrice !== undefined ? { recommendedPrice: new Prisma.Decimal(recommended) } : {}),
       ...(input.minimumPrice !== undefined ? { minimumPrice: new Prisma.Decimal(minimum) } : {}),
@@ -223,6 +238,27 @@ export class ProductsService {
     const maxValue = costValue.plus(markup);
     if (costValue.isNegative() || minValue.lessThan(costValue) || recommendedValue.lessThan(minValue) || recommendedValue.greaterThan(maxValue)) {
       throw new BadRequestException('Prices must satisfy cost ≤ minimum ≤ recommended ≤ cost + maximum markup');
+    }
+  }
+
+  private async validateAttributes(categoryId: string, values?: Record<string, unknown>) {
+    const category = await this.prisma.category.findUnique({ where: { id: categoryId }, select: { attributes: true } });
+    if (!category) throw new NotFoundException('Category not found');
+    const safeValues = values ?? {};
+    const definitions = category.attributes;
+    const allowed = new Set(definitions.map((definition) => definition.key));
+    if (Object.keys(safeValues).some((key) => !allowed.has(key))) throw new BadRequestException('Product contains attributes not configured for its category');
+    for (const definition of definitions) {
+      const value = safeValues[definition.key];
+      if ((value === undefined || value === null || value === '') && definition.required) throw new BadRequestException(`${definition.label} is required`);
+      if (value === undefined || value === null || value === '') continue;
+      const valid = definition.type === 'text' ? typeof value === 'string' && value.length <= 500
+        : definition.type === 'number' ? typeof value === 'number' && Number.isFinite(value)
+        : definition.type === 'boolean' ? typeof value === 'boolean'
+        : definition.type === 'date' ? typeof value === 'string' && !Number.isNaN(Date.parse(value))
+        : definition.type === 'select' ? typeof value === 'string' && Array.isArray(definition.options) && definition.options.includes(value)
+        : false;
+      if (!valid) throw new BadRequestException(`${definition.label} has an invalid value`);
     }
   }
 

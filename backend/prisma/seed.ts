@@ -35,6 +35,14 @@ async function seed(): Promise<void> {
     update: {},
   });
 
+  for (const department of [
+    { id: 'dept_home', name: 'Дом и быт', slug: 'home', description: 'Практичные вещи для дома и повседневной жизни.', sortOrder: 0 },
+    { id: 'dept_perfume', name: 'Парфюмерия', slug: 'perfume', description: 'Ароматы для себя и дома.', sortOrder: 1 },
+    { id: 'dept_food', name: 'Продукты питания', slug: 'food', description: 'Натуральные продукты и вкусные подарки.', sortOrder: 2 },
+  ]) {
+    await prisma.department.upsert({ where: { slug: department.slug }, create: department, update: {} });
+  }
+
   const sampleProducts = [
     { sku: 'PET-BOWL-01', name: 'Миска для питомца', description: 'Устойчивая миска для ежедневного кормления.', category: 'Для животных', cost: '25000', recommended: '40000', minimum: '30000', markup: '25000', stock: 25, image: 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&w=800&q=80' },
     { sku: 'PET-TOY-01', name: 'Игрушка для собак', description: 'Прочная игрушка для активных игр и прогулок.', category: 'Для животных', cost: '18000', recommended: '30000', minimum: '22000', markup: '18000', stock: 18, image: 'https://images.unsplash.com/photo-1535294435445-d7249524ef2e?auto=format&fit=crop&w=800&q=80' },
@@ -48,6 +56,7 @@ async function seed(): Promise<void> {
       create: {
         slug: `seed-category-${index < 2 ? 'pets' : 'home'}`,
         name: item.category,
+        departmentId: 'dept_home',
       },
       update: {},
     });
